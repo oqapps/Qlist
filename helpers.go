@@ -71,7 +71,7 @@ func (n *treeNode) PathToNode(path string) *treeNode {
 		currNode = currNode.GetChild(elem)
 		if currNode == nil {
 			break
-		}p
+		}
 	}
 	return currNode
 }
