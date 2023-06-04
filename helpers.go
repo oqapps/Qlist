@@ -71,9 +71,22 @@ func (n *treeNode) PathToNode(path string) *treeNode {
 		currNode = currNode.GetChild(elem)
 		if currNode == nil {
 			break
-		}
+		}p
 	}
 	return currNode
+}
+
+func dataString(data []byte) string {
+    var builder strings.Builder
+    builder.WriteString("<")
+    for i, b := range data {
+        builder.WriteString(fmt.Sprintf("%02X", b))
+        if (i+1)%4 == 0 && i != len(data)-1 {
+            builder.WriteString(" ")
+        }
+    }
+    builder.WriteString(">")
+    return builder.String()
 }
 
 func GetType(entry Entry) (string, Value) {
@@ -115,12 +128,9 @@ func GetType(entry Entry) (string, Value) {
 				if valid.IsInt(value.display) {
 					t = "Number"
 				} else {
-					var str string
 					data := entry.value.([]uint8)
-					for _, bit := range data {
-						str += fmt.Sprintf("%v", bit)
-					}
-					value.display = str
+					
+					value.display = dataString(data)
 					t = "Data"
 				}	
 			}
