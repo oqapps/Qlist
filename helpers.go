@@ -64,7 +64,7 @@ func (n *treeNode) CountChildren() int {
 
 func (n *treeNode) PathToNode(path string) *treeNode {
 	currNode := n
-	for _, elem := range strings.Split(path, "/") {
+	for _, elem := range strings.Split(path, "\\-\\") {
 		if elem == "" {
 			continue
 		}
@@ -102,9 +102,9 @@ func GetType(entry Entry) (string, Value) {
 				}
 			} else {
 				t = "Dictionary"
-				value = Value{display:fmt.Sprintf("%v dictionaries", len(entry.children))}
+				value = Value{display:fmt.Sprintf("%v key/value entries", len(entry.children))}
 				if len(entry.children) == 1 {
-					value.display = "1 dictionary"
+					value.display = "1 key/value entry"
 				}
 			}
 		} else {

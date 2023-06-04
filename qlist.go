@@ -34,7 +34,7 @@ func main() {
 				node := root.PathToNode(tni)
 				if node != nil {
 					for _, label := range node.ChildrenKeys() {
-						nodes = append(nodes, tni+"/"+label)
+						nodes = append(nodes, tni+"\\-\\"+label)
 					}
 				}
 			}

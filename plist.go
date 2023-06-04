@@ -12,16 +12,27 @@ type Entry struct {
 	value    interface{}
 	children []Entry
 	path     []string
-	index    int
 	array    bool
-	parent bool
+	parent   bool
+	index    int
 }
 
 var plistData plist.OrderedDict
 
 var entries []Entry
 
-func Get (dict plist.OrderedDict, key string) interface{} {
+func GetEntry(index int) Entry {
+	var entry Entry
+	for _, i := range entries {
+		if i.index == index {
+			entry = i
+			break
+		}
+	}
+	return entry
+}
+
+func Get(dict plist.OrderedDict, key string) interface{} {
 	var index int
 	for i, k := range dict.Keys {
 		if k == key {
@@ -90,11 +101,12 @@ func (entry Entry) SetKey(value string) {
 }
 
 func Parse(key string, data interface{}, path []string) Entry {
-	index := len(entries) + 1
+	index := len(entries)
 	switch v := data.(type) {
 	case []interface{}:
 		var children []Entry
 		for i, item := range v {
+			index +=1
 			children = append(children, Parse(fmt.Sprintf("%v", i), item, append(path, fmt.Sprintf("%v", i))))
 		}
 		return Entry{key: key, children: children, index: index, path: path, parent: true}
