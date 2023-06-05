@@ -94,10 +94,10 @@ func main() {
 
 	a := app.New()
 	w := a.NewWindow("Qlist Plist Editor")
-	if os.Args[0] != "" {
-		if b, _ := govalidator.IsFilePath(os.Args[0]); b {
-			if strings.HasSuffix(os.Args[0], ".plist") {
-				filename = os.Args[0]
+	for _, a := range os.Args {
+		if b, _ := govalidator.IsFilePath(a); b {
+			if strings.HasSuffix(a, ".plist") {
+				filename = a
 			}
 		}
 	}
