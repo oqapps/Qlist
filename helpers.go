@@ -15,7 +15,7 @@ type treeNode struct {
 }
 
 type Value struct {
-	real interface{}
+	real    interface{}
 	display string
 }
 
@@ -39,7 +39,6 @@ func (n *treeNode) AddChild(entry Entry) *treeNode {
 	n.children = append(n.children, new)
 	return new
 }
-
 
 func (n *treeNode) ChildrenKeys() (ret []string) {
 	for i := 0; i < len(n.children); i++ {
@@ -77,16 +76,16 @@ func (n *treeNode) PathToNode(path string) *treeNode {
 }
 
 func dataString(data []byte) string {
-    var builder strings.Builder
-    builder.WriteString("<")
-    for i, b := range data {
-        builder.WriteString(fmt.Sprintf("%02X", b))
-        if (i+1)%4 == 0 && i != len(data)-1 {
-            builder.WriteString(" ")
-        }
-    }
-    builder.WriteString(">")
-    return builder.String()
+	var builder strings.Builder
+	builder.WriteString("<")
+	for i, b := range data {
+		builder.WriteString(fmt.Sprintf("%02X", b))
+		if (i+1)%4 == 0 && i != len(data)-1 {
+			builder.WriteString(" ")
+		}
+	}
+	builder.WriteString(">")
+	return builder.String()
 }
 
 func GetType(entry Entry) (string, Value) {
@@ -96,23 +95,23 @@ func GetType(entry Entry) (string, Value) {
 		if entry.parent {
 			if entry.array {
 				t = "Array"
-				value = Value{display:fmt.Sprintf("%v children", len(entry.children))}
+				value = Value{display: fmt.Sprintf("%v children", len(entry.children))}
 				if len(entry.children) == 1 {
 					value.display = "1 child"
 				}
 			} else {
 				t = "Dictionary"
-				value = Value{display:fmt.Sprintf("%v key/value entries", len(entry.children))}
+				value = Value{display: fmt.Sprintf("%v key/value entries", len(entry.children))}
 				if len(entry.children) == 1 {
 					value.display = "1 key/value entry"
 				}
 			}
 		} else {
 			t = "String"
-			value = Value{display:fmt.Sprintf("%v", entry.value)}
+			value = Value{display: fmt.Sprintf("%v", entry.value)}
 		}
 	} else {
-		value = Value{display:fmt.Sprintf("%v", entry.value),real:entry.value}
+		value = Value{display: fmt.Sprintf("%v", entry.value), real: entry.value}
 		switch reflect.TypeOf(entry.value).Name() {
 		case "bool":
 			{
@@ -129,10 +128,10 @@ func GetType(entry Entry) (string, Value) {
 					t = "Number"
 				} else {
 					data := entry.value.([]uint8)
-					
+
 					value.display = dataString(data)
 					t = "Data"
-				}	
+				}
 			}
 		}
 	}

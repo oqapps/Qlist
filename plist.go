@@ -18,6 +18,7 @@ type Entry struct {
 }
 
 var plistData plist.OrderedDict
+var arrayPlist []interface{}
 
 var entries []Entry
 
@@ -106,7 +107,7 @@ func Parse(key string, data interface{}, path []string) Entry {
 	case []interface{}:
 		var children []Entry
 		for i, item := range v {
-			index +=1
+			index += 1
 			children = append(children, Parse(fmt.Sprintf("%v", i), item, append(path, fmt.Sprintf("%v", i))))
 		}
 		return Entry{key: key, children: children, index: index, path: path, parent: true}

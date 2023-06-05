@@ -20,12 +20,27 @@ import (
 	"github.com/sqweek/dialog"
 )
 
-
 func main() {
 
 	a := app.New()
 	w := a.NewWindow("Qlist Plist Editor")
+	w.SetCloseIntercept(func() {
+		if len(plistData.Keys) > 0 {
+			response, _ := mack.AlertBox(mack.AlertOptions{
+				Title:   "Do you want to save this file?",
+				Style:   "critical",
+				Buttons: "No, Yes, Cancel",
+			})
+			if response.Clicked == "No" {
+				w.Close()
+			}
+		} else {
+			w.Close()
+		}
+	})
 	var root treeNode
+	var plistType string
+	var r = treeNode{entry: Entry{key: "Root"}}
 	tree := widget.NewTree(
 		func(tni widget.TreeNodeID) (nodes []widget.TreeNodeID) {
 			if tni == "" {
@@ -64,12 +79,22 @@ func main() {
 				value.Text = "N/A"
 
 			} else {
-				t, v := GetType(node.entry)
-				key.Text = node.entry.key
-				typ.Text = t
-				value.Text = v.display
+				if node.entry.key == "Root" {
+					key.Text = "Root"
+						typ.Text = plistType
+						if len(entries) == 1 {
+							value.Text = "1 key/value entries"
+						} else {
+							value.Text = fmt.Sprintf("%v key/value entries", len(entries))
+						}
+				
+				} else {
+					t, v := GetType(node.entry)
+					key.Text = node.entry.key
+					typ.Text = t
+					value.Text = v.display
+				}
 			}
-
 		},
 	)
 	text := canvas.NewText("Please upload a plist file", theme.TextColor())
@@ -96,20 +121,37 @@ func main() {
 			fmt.Println("Error reading file:", err)
 			return
 		}
-
+		plistData = plist.OrderedDict{}
+		entries = []Entry{}
+		root = treeNode{}
 		_, err = plist.Unmarshal(content, &plistData)
 		if err != nil {
-			fmt.Println("Error parsing plist data:", err)
-			mack.Alert("Error", "Failed to parse plist", "critical")
-			w.Close()
-			return
+			_, e := plist.Unmarshal(content, &arrayPlist)
+			if e != nil {
+				fmt.Println("Error parsing dict plist data:", err)
+				fmt.Println("Error parsing array plist data:", e)
+				mack.Alert("Error", "Failed to parse plist", "critical")
+				w.Close()
+			} else {
+				fmt.Printf("[INFO] Parsed array plist %s\n", filename)
+				plistType = "Array"
+				for index, value := range arrayPlist {
+					key := fmt.Sprintf("%v", index)
+					entry := Parse(key, value, []string{key})
+					entries = append(entries, entry)
+				}
+			}
+		} else {
+			fmt.Printf("[INFO] Parsed dict plist %s\n", filename)
+			plistType = "Dictionary"
+			for index, key := range plistData.Keys {
+				entry := Parse(key, plistData.Values[index], []string{key})
+				entries = append(entries, entry)
+			}
 		}
-		for index, key := range plistData.Keys {
-			entry := Parse(key, plistData.Values[index], []string{key})
-			entries = append(entries, entry)
-		}
+		root.children = append(root.children, &r)
 		for _, e := range entries {
-			t := root.AddChild(e)
+			t := r.AddChild(e)
 			if len(e.children) != 0 {
 				for _, c := range e.children {
 					node := t.AddChild(c)
