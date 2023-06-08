@@ -11,22 +11,23 @@ type Entry struct {
 	key      string
 	value    interface{}
 	children []Entry
-	path     []string
+	path     string
 	array    bool
-	parent   bool
+	isParent bool
 	index    int
 }
 
 var plistData plist.OrderedDict
 var arrayPlist []interface{}
 
-var entries []Entry
+//type Entries = *orderedmap.OrderedMap[string, Entry]
+type Entries = map[string]Entry
 
-func GetEntry(index int) Entry {
+func GetEntry(entries Entries, index int) Entry {
 	var entry Entry
-	for _, i := range entries {
-		if i.index == index {
-			entry = i
+	for _, e := range entries {
+		if e.index == index {
+			entry = e
 			break
 		}
 	}
@@ -44,7 +45,7 @@ func Get(dict plist.OrderedDict, key string) interface{} {
 	return dict.Values[index]
 }
 
-func (entry Entry) SetValue(value interface{}) {
+/*func (entry Entry) SetValue(value interface{}) {
 	entry.value = value
 	var element = Get(plistData, entry.path[0])
 	for i, p := range entry.path {
@@ -99,48 +100,65 @@ func (entry Entry) SetKey(value string) {
 	data := (element.(map[string]interface{}))[entry.key]
 	delete(element.(map[string]interface{}), entry.key)
 	(element.(map[string]interface{}))[value] = data
+}*/
+
+func AppendToPath(path string, index ...int) string {
+	for _, p := range index {
+		i := strconv.Itoa(p)
+		path += "\\-\\" + i
+	}
+	return path
 }
 
-func Parse(key string, data interface{}, path []string) Entry {
-	index := len(entries)
+func Parse(key string, data interface{}, path string, index int, entries Entries) Entry {
 	switch v := data.(type) {
 	case []interface{}:
 		var children []Entry
 		for i, item := range v {
-			index += 1
-			children = append(children, Parse(fmt.Sprintf("%v", i), item, append(path, fmt.Sprintf("%v", i))))
+			children = append(children, Parse(fmt.Sprintf("%v", i), item, AppendToPath(path, i), index, entries))
 		}
-		return Entry{key: key, children: children, index: index, path: path, parent: true}
+		entry := Entry{key: key, children: children, index: index, path: path, isParent: true}
+		entries[path] = entry
+		return entry
 	case plist.OrderedDict:
 		var children []Entry
 		for f, a := range v.Keys {
+			p := AppendToPath(path, f)
 			value := v.Values[f]
-			index += 1
 			x, ok := value.(plist.OrderedDict)
 			if ok {
 				var ch []Entry
 				for c, k := range x.Keys {
 					m := x.Values[c]
-					ch = append(ch, Parse(k, m, append(path, k)))
+					ch = append(ch, Parse(k, m, AppendToPath(p, c), index, entries))
 				}
-
-				children = append(children, Entry{key: a, children: ch, path: append(path, a), index: index, parent: true})
+				e := Entry{key: a, children: ch, path: p, index: f, isParent: true}
+				children = append(children, e)
+				entries[p] = e
 			} else {
 				m, ok := value.([]interface{})
 				if ok {
 					var ch []Entry
-					for i, a := range m {
+					for i, q := range m {
 						in := strconv.Itoa(i)
-						ch = append(ch, Parse(in, a, append(path, in)))
+						ch = append(ch, Parse(in, q, AppendToPath(p, i), index, entries))
 					}
-					children = append(children, Entry{key: a, children: ch, path: append(path, a), index: index, array: true, parent: true})
+					e := Entry{key: a, children: ch, path: p, index: f, array: true, isParent: true}
+					children = append(children, e)
+					entries[p] = e
 				} else {
-					children = append(children, Entry{key: a, value: value, path: append(path, a), index: index})
+					e := Entry{key: a, value: value, path: p, index: f}
+					children = append(children, e)
+					entries[p] = e
 				}
 			}
 		}
-		return Entry{key: key, children: children, path: path, index: index, parent: true}
+		entry := Entry{key: key, children: children, path: path, index: index, isParent: true}
+		entries[path] = entry
+		return entry
 	default:
-		return Entry{key: key, value: v, path: append(path, key), index: index}
+		entry := Entry{key: key, value: v, path: path, index: index}
+		entries[path] = entry
+		return entry
 	}
 }

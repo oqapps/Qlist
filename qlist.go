@@ -3,7 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
+
 	"runtime"
+
 	"strings"
 
 	"io/ioutil"
@@ -11,6 +14,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
+
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
@@ -23,28 +27,25 @@ import (
 	"github.com/sqweek/dialog"
 )
 
-var root treeNode
 var plistType string
 var filename string
-var r = treeNode{entry: Entry{key: "Root"}}
 
-func ParsePlist(filename string, w fyne.Window, tree *widget.Tree) {
+
+func ParsePlist(filename string, w fyne.Window, tree *widget.Tree, entries Entries) *Entries {
 	file, err := os.Open(filename)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
-		return
+		return nil
 	}
 	defer file.Close()
 
 	content, err := ioutil.ReadAll(file)
 	if err != nil {
 		fmt.Println("Error reading file:", err)
-		return
+		return nil
 	}
 	plistData = plist.OrderedDict{}
-	entries = []Entry{}
-	root = treeNode{}
-	r = treeNode{entry: Entry{key: "Root"}}
+	entries = make(Entries)
 	_, err = plist.Unmarshal(content, &plistData)
 	if err != nil {
 		_, e := plist.Unmarshal(content, &arrayPlist)
@@ -58,40 +59,27 @@ func ParsePlist(filename string, w fyne.Window, tree *widget.Tree) {
 			plistType = "Array"
 			for index, value := range arrayPlist {
 				key := fmt.Sprintf("%v", index)
-				entry := Parse(key, value, []string{key})
-				entries = append(entries, entry)
+				path := strconv.Itoa(index)
+				entry := Parse(key, value, path, len(entries), entries)
+				entries[path] = entry
 			}
 		}
 	} else {
 		fmt.Printf("[INFO] Parsed dict plist %s\n", filename)
 		plistType = "Dictionary"
 		for index, key := range plistData.Keys {
-			entry := Parse(key, plistData.Values[index], []string{key})
-			entries = append(entries, entry)
+			path := strconv.Itoa(index)
+			Parse(key, plistData.Values[index], path, len(entries), entries)
 		}
 	}
-	root.children = append(root.children, &r)
-	for _, e := range entries {
-		t := r.AddChild(e)
-		if len(e.children) != 0 {
-			for _, c := range e.children {
-				node := t.AddChild(c)
-				if len(c.children) != 0 {
-					for _, m := range c.children {
-						ParseChildren(node, m)
-					}
-				}
-			}
-		}
-	}
-	tree.Refresh()
 	tree.OpenAllBranches()
 	w.SetTitle(filename)
 	w.SetContent(tree)
+	return &entries
 }
 
 func main() {
-
+	entries := make(Entries)
 	a := app.New()
 	w := a.NewWindow("Qlist Plist Editor")
 	for _, a := range os.Args {
@@ -119,62 +107,74 @@ func main() {
 			w.Close()
 		}
 	})
+
 	tree := widget.NewTree(
-		func(tni widget.TreeNodeID) (nodes []widget.TreeNodeID) {
-			if tni == "" {
-				nodes = root.ChildrenKeys()
+		func(path widget.TreeNodeID) []widget.TreeNodeID {
+			children := []string{}
+			if path == "" {
+				children = append(children, "Root")
 			} else {
-				node := root.PathToNode(tni)
-				if node != nil {
-					for _, label := range node.ChildrenKeys() {
-						nodes = append(nodes, tni+"\\-\\"+label)
+				if path == "Root" {
+					for i := 0; i < len(plistData.Keys); i++ {
+						children = append(children, strconv.Itoa(i))
+					}
+				} else {
+					entry := entries[path]
+					for i := 0; i < len(entry.children); i++ {
+						children = append(children, entry.children[i].path)
 					}
 				}
 			}
-			return
+			return children
 		},
-		func(tni widget.TreeNodeID) bool {
-			if node := root.PathToNode(tni); node != nil && node.CountChildren() > 0 {
+		func(path widget.TreeNodeID) bool {
+			if path == "" || path == "Root" {
+				return true
+			}
+			entry := entries[path]
+			if &entry == nil {
+				return false
+			}
+			if entry.value == nil {
 				return true
 			}
 			return false
 		},
-		func(b bool) fyne.CanvasObject {
+		func(branch bool) fyne.CanvasObject {
 			key := canvas.NewText("Key", theme.TextColor())
 			typ := canvas.NewText("Type", theme.TextColor())
 			value := canvas.NewText("Value", theme.TextColor())
 			return container.New(layout.NewGridLayout(3), key, typ, value)
 		},
-		func(tni widget.TreeNodeID, b bool, co fyne.CanvasObject) {
-			node := root.PathToNode(tni)
-			container, _ := co.(*fyne.Container)
+		func(path widget.TreeNodeID, branch bool, o fyne.CanvasObject) {
+			container, _ := o.(*fyne.Container)
 			key := container.Objects[0].(*canvas.Text)
 			typ := container.Objects[1].(*canvas.Text)
 			value := container.Objects[2].(*canvas.Text)
-			if node == nil || &node.entry == nil {
-				key.Text = "N/A"
-				typ.Text = "N/A"
-				value.Text = "N/A"
-
-			} else {
-				if node.entry.key == "Root" {
-					key.Text = "Root"
-					typ.Text = plistType
-					if len(entries) == 1 {
-						value.Text = "1 key/value entries"
-					} else {
-						value.Text = fmt.Sprintf("%v key/value entries", len(entries))
-					}
-
+			if path == "Root" {
+				key.Text = "Root"
+				typ.Text = plistType
+				if len(entries) == 1 {
+					value.Text = "1 key/value entries"
 				} else {
-					t, v := GetType(node.entry)
-					key.Text = node.entry.key
+					value.Text = fmt.Sprintf("%v key/value entries", len(entries))
+				}
+			} else {
+				key.Text = path
+				entry := entries[path]
+				if &entry == nil {
+					key.Text = "N/A"
+					typ.Text = "N/A"
+					value.Text = "N/A"
+				} else {
+					t, v := GetType(entry)
+					key.Text = entry.key
 					typ.Text = t
 					value.Text = v.display
 				}
 			}
-		},
-	)
+			return
+		})
 	text := canvas.NewText("Please upload a plist file", theme.TextColor())
 	text.Alignment = fyne.TextAlignCenter
 	text.TextSize = 25
@@ -186,8 +186,7 @@ func main() {
 			fmt.Println("Error opening file:", err)
 			return
 		}
-		ParsePlist(filename, w, tree)
-
+		entries = *ParsePlist(filename, w, tree, entries)
 	})
 
 	filemenu := fyne.NewMenu("File", fileitem)
@@ -199,7 +198,7 @@ func main() {
 	if filename == "" {
 		w.SetContent(text)
 	} else {
-		ParsePlist(filename, w, tree)
+		entries = *ParsePlist(filename, w, tree, entries)
 	}
 
 	w.ShowAndRun()
