@@ -6,7 +6,6 @@ require (
 	fyne.io/fyne/v2 v2.3.4
 	github.com/andybrewer/mack v0.0.0-20220307193339-22e922cc18af
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
-	github.com/deitrix/go-plist v0.0.0-20230603201321-6fac41145996
 	github.com/fstanis/screenresolution v0.0.0-20190527020317-869904d15333
 	github.com/iancoleman/strcase v0.2.0
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf
@@ -16,6 +15,7 @@ require (
 	fyne.io/systray v1.10.1-0.20230403195833-7dc3c09283d6 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20180517000239-4f5cfb03fabf // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/deitrix/go-plist v0.0.0-20230603201321-6fac41145996
 	github.com/fredbi/uri v0.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/fyne-io/gl-js v0.0.0-20220119005834-d2da28d9ccfe // indirect

@@ -20,7 +20,6 @@ type Entry struct {
 var plistData plist.OrderedDict
 var arrayPlist []interface{}
 
-//type Entries = *orderedmap.OrderedMap[string, Entry]
 type Entries = map[string]Entry
 
 func GetEntry(entries Entries, index int) Entry {

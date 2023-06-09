@@ -29,7 +29,7 @@ import (
 
 var plistType string
 var filename string
-
+var manager = Manager{}
 
 func ParsePlist(filename string, w fyne.Window, tree *widget.Tree, entries Entries) *Entries {
 	file, err := os.Open(filename)
@@ -45,6 +45,7 @@ func ParsePlist(filename string, w fyne.Window, tree *widget.Tree, entries Entri
 		return nil
 	}
 	plistData = plist.OrderedDict{}
+	arrayPlist = []interface{}{}
 	entries = make(Entries)
 	_, err = plist.Unmarshal(content, &plistData)
 	if err != nil {
@@ -115,7 +116,7 @@ func main() {
 				children = append(children, "Root")
 			} else {
 				if path == "Root" {
-					for i := 0; i < len(plistData.Keys); i++ {
+					for i := 0; i < len(manager.Keys()); i++ {
 						children = append(children, strconv.Itoa(i))
 					}
 				} else {
@@ -154,10 +155,10 @@ func main() {
 			if path == "Root" {
 				key.Text = "Root"
 				typ.Text = plistType
-				if len(entries) == 1 {
+				if manager.Length() == 1 {
 					value.Text = "1 key/value entries"
 				} else {
-					value.Text = fmt.Sprintf("%v key/value entries", len(entries))
+					value.Text = fmt.Sprintf("%v key/value entries", manager.Length())
 				}
 			} else {
 				key.Text = path

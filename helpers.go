@@ -3,16 +3,54 @@ package main
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	valid "github.com/asaskevich/govalidator"
 	"github.com/iancoleman/strcase"
 )
 
-
 type Value struct {
 	real    interface{}
 	display string
+}
+
+type Manager struct{}
+
+func (manager Manager) Type() string {
+	if len(arrayPlist) != 0 {
+		return "array"
+	} else if len(plistData.Keys) != 0 {
+		return "dict"
+	} else {
+		return "unknown"
+	}
+}
+
+func (manager Manager) Length() int {
+	switch manager.Type() {
+	case "array":
+		return len(arrayPlist)
+	case "dict":
+		return len(plistData.Keys)
+	default:
+		return 0
+	}
+}
+
+func (manager Manager) Keys() []string {
+	children := []string{}
+	switch manager.Type() {
+	case "array":
+		for i := 0; i < len(arrayPlist); i++ {
+			children = append(children, strconv.Itoa(i))
+		}
+		return children
+	case "dict":
+		return plistData.Keys
+	default:
+		return children
+	}
 }
 
 func dataString(data []byte) string {
