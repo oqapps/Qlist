@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/deitrix/go-plist"
+	"github.com/oq-x/go-plist"
 )
 
 type Entry struct {

@@ -23,7 +23,7 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/fstanis/screenresolution"
 
-	"github.com/deitrix/go-plist"
+	"github.com/oq-x/go-plist"
 	"github.com/sqweek/dialog"
 )
 
