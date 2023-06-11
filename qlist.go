@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"qlist/widgets"
 	"strconv"
 
 	"runtime"
@@ -142,36 +143,49 @@ func main() {
 			return false
 		},
 		func(branch bool) fyne.CanvasObject {
-			key := canvas.NewText("Key", theme.TextColor())
-			typ := canvas.NewText("Type", theme.TextColor())
-			value := canvas.NewText("Value", theme.TextColor())
-			return container.New(layout.NewGridLayout(3), key, typ, value)
+			key := widgets.NewText("Key")
+			keyEntry := widgets.NewEntry(key.Resource.Text)
+			keyEntry.Hide()
+			key.SetDoubleTapEvent(func(_ *fyne.PointEvent) {
+				key.Hide()
+				keyEntry.Show()
+			})
+			typ := widgets.NewText("Type")
+			value := widgets.NewText("Value")
+			valueEntry := widgets.NewEntry(value.Resource.Text)
+			valueEntry.Hide()
+			value.SetDoubleTapEvent(func(_ *fyne.PointEvent) {
+				value.Hide()
+				valueEntry.Show()
+			})
+			
+			return container.New(layout.NewGridLayout(3), key, keyEntry, typ, value)
 		},
 		func(path widget.TreeNodeID, branch bool, o fyne.CanvasObject) {
 			container, _ := o.(*fyne.Container)
-			key := container.Objects[0].(*canvas.Text)
-			typ := container.Objects[1].(*canvas.Text)
-			value := container.Objects[2].(*canvas.Text)
+			key := container.Objects[0].(*widgets.Text)
+			typ := container.Objects[2].(*widgets.Text)
+			value := container.Objects[3].(*widgets.Text)
 			if path == "Root" {
-				key.Text = "Root"
-				typ.Text = plistType
+				key.SetText("Root")
+				typ.SetText(plistType)
 				if manager.Length() == 1 {
-					value.Text = "1 key/value entries"
+					value.SetText("1 key/value entries")
 				} else {
-					value.Text = fmt.Sprintf("%v key/value entries", manager.Length())
+					value.SetText(fmt.Sprintf("%v key/value entries", manager.Length()))
 				}
 			} else {
-				key.Text = path
+				key.SetText(path)
 				entry := entries[path]
 				if &entry == nil {
-					key.Text = "N/A"
-					typ.Text = "N/A"
-					value.Text = "N/A"
+					key.SetText("N/A")
+					typ.SetText("N/A")
+					value.SetText("N/A")
 				} else {
 					t, v := GetType(entry)
-					key.Text = entry.key
-					typ.Text = t
-					value.Text = v.display
+					key.SetText(entry.key)
+					typ.SetText(t)
+					value.SetText(v.display)
 				}
 			}
 			return
