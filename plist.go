@@ -8,13 +8,14 @@ import (
 )
 
 type Entry struct {
-	key      string
-	value    interface{}
-	children []Entry
-	path     string
-	array    bool
-	isParent bool
-	index    int
+	key           string
+	value         interface{}
+	children      []Entry
+	childrenPaths []string
+	path          string
+	array         bool
+	isParent      bool
+	index         int
 }
 
 var plistData plist.OrderedDict
@@ -101,58 +102,63 @@ func (entry Entry) SetKey(value string) {
 	(element.(map[string]interface{}))[value] = data
 }*/
 
-func AppendToPath(path string, index ...int) string {
+func AppendToPath(path string, index ...string) string {
 	for _, p := range index {
-		i := strconv.Itoa(p)
-		path += "\\-\\" + i
+		path += "\\-\\" + p
 	}
 	return path
 }
 
 func Parse(key string, data interface{}, path string, index int, entries Entries) Entry {
+	var children []Entry
+	var childrenPaths []string
 	switch v := data.(type) {
 	case []interface{}:
-		var children []Entry
 		for i, item := range v {
-			children = append(children, Parse(fmt.Sprintf("%v", i), item, AppendToPath(path, i), index, entries))
+			children = append(children, Parse(fmt.Sprintf("%d", i), item, AppendToPath(path, fmt.Sprintf("%d", i)), index, entries))
+			childrenPaths = append(childrenPaths, AppendToPath(path, fmt.Sprintf("%d", i)))
 		}
-		entry := Entry{key: key, children: children, index: index, path: path, isParent: true}
+		entry := Entry{key: key, children: children, index: index, path: path, isParent: true, childrenPaths: childrenPaths}
 		entries[path] = entry
 		return entry
 	case plist.OrderedDict:
-		var children []Entry
 		for f, a := range v.Keys {
-			p := AppendToPath(path, f)
+			p := AppendToPath(path, a)
 			value := v.Values[f]
 			x, ok := value.(plist.OrderedDict)
+			var ch []Entry
+			var chp []string
 			if ok {
-				var ch []Entry
 				for c, k := range x.Keys {
 					m := x.Values[c]
-					ch = append(ch, Parse(k, m, AppendToPath(p, c), index, entries))
+					ch = append(ch, Parse(k, m, AppendToPath(p, k), index, entries))
+					chp = append(chp, AppendToPath(p, k))
 				}
-				e := Entry{key: a, children: ch, path: p, index: f, isParent: true}
+				e := Entry{key: a, children: ch, path: p, index: f, isParent: true, childrenPaths: chp}
 				children = append(children, e)
+				childrenPaths = append(childrenPaths, p)
 				entries[p] = e
 			} else {
 				m, ok := value.([]interface{})
 				if ok {
-					var ch []Entry
 					for i, q := range m {
 						in := strconv.Itoa(i)
-						ch = append(ch, Parse(in, q, AppendToPath(p, i), index, entries))
+						ch = append(ch, Parse(in, q, AppendToPath(p, in), index, entries))
+						chp = append(chp, AppendToPath(p, in))
 					}
-					e := Entry{key: a, children: ch, path: p, index: f, array: true, isParent: true}
+					e := Entry{key: a, children: ch, path: p, index: f, array: true, isParent: true, childrenPaths: chp}
 					children = append(children, e)
+					childrenPaths = append(childrenPaths, p)
 					entries[p] = e
 				} else {
 					e := Entry{key: a, value: value, path: p, index: f}
 					children = append(children, e)
+					childrenPaths = append(childrenPaths, p)
 					entries[p] = e
 				}
 			}
 		}
-		entry := Entry{key: key, children: children, path: path, index: index, isParent: true}
+		entry := Entry{key: key, children: children, childrenPaths: childrenPaths, path: path, index: index, isParent: true}
 		entries[path] = entry
 		return entry
 	default:

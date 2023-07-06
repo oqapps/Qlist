@@ -10,8 +10,6 @@ import (
 
 	"strings"
 
-	"io/ioutil"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
@@ -22,6 +20,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/andybrewer/mack"
 	"github.com/asaskevich/govalidator"
+
 	"github.com/fstanis/screenresolution"
 
 	"github.com/oq-x/go-plist"
@@ -33,16 +32,9 @@ var filename string
 var manager = Manager{}
 
 func ParsePlist(filename string, w fyne.Window, tree *widget.Tree, entries Entries) *Entries {
-	file, err := os.Open(filename)
+	content, err := os.ReadFile(filename)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
-		return nil
-	}
-	defer file.Close()
-
-	content, err := ioutil.ReadAll(file)
-	if err != nil {
-		fmt.Println("Error reading file:", err)
 		return nil
 	}
 	plistData = plist.OrderedDict{}
@@ -70,8 +62,7 @@ func ParsePlist(filename string, w fyne.Window, tree *widget.Tree, entries Entri
 		fmt.Printf("[INFO] Parsed dict plist %s\n", filename)
 		plistType = "Dictionary"
 		for index, key := range plistData.Keys {
-			path := strconv.Itoa(index)
-			Parse(key, plistData.Values[index], path, len(entries), entries)
+			Parse(key, plistData.Values[index], key, len(entries), entries)
 		}
 	}
 	tree.OpenAllBranches()
@@ -109,7 +100,6 @@ func main() {
 			w.Close()
 		}
 	})
-
 	tree := widget.NewTree(
 		func(path widget.TreeNodeID) []widget.TreeNodeID {
 			children := []string{}
@@ -117,14 +107,10 @@ func main() {
 				children = append(children, "Root")
 			} else {
 				if path == "Root" {
-					for i := 0; i < len(manager.Keys()); i++ {
-						children = append(children, strconv.Itoa(i))
-					}
+					children = manager.Keys()
 				} else {
 					entry := entries[path]
-					for i := 0; i < len(entry.children); i++ {
-						children = append(children, entry.children[i].path)
-					}
+					children = entry.childrenPaths
 				}
 			}
 			return children
@@ -148,6 +134,7 @@ func main() {
 			keyEntry.Hide()
 			key.SetDoubleTapEvent(func(_ *fyne.PointEvent) {
 				key.Hide()
+				keyEntry.SetText(key.Resource.Text)
 				keyEntry.Show()
 			})
 			typ := widgets.NewText("Type")
@@ -158,7 +145,7 @@ func main() {
 				value.Hide()
 				valueEntry.Show()
 			})
-			
+
 			return container.New(layout.NewGridLayout(3), key, keyEntry, typ, value)
 		},
 		func(path widget.TreeNodeID, branch bool, o fyne.CanvasObject) {
@@ -175,7 +162,6 @@ func main() {
 					value.SetText(fmt.Sprintf("%v key/value entries", manager.Length()))
 				}
 			} else {
-				key.SetText(path)
 				entry := entries[path]
 				if &entry == nil {
 					key.SetText("N/A")
@@ -193,7 +179,6 @@ func main() {
 	text := canvas.NewText("Please upload a plist file", theme.TextColor())
 	text.Alignment = fyne.TextAlignCenter
 	text.TextSize = 25
-	text.Refresh()
 
 	fileitem := fyne.NewMenuItem("Open", func() {
 		filename, err := dialog.File().Filter("Property-List File", "plist").Load()
