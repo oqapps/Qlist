@@ -13,9 +13,9 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/layout"
 
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/andybrewer/mack"
@@ -30,8 +30,10 @@ import (
 var plistType string
 var filename string
 var manager = Manager{}
+var types = []string{"String", "Number", "Data", "Dictionary", "Array", "Date", "Boolean"}
+var topTypes = []string{types[3], types[4]}
 
-func ParsePlist(filename string, w fyne.Window, tree *widget.Tree, entries Entries) *Entries {
+func ParsePlist(filename string, w fyne.Window, entries Entries) *Entries {
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
@@ -65,6 +67,68 @@ func ParsePlist(filename string, w fyne.Window, tree *widget.Tree, entries Entri
 			Parse(key, plistData.Values[index], key, len(entries), entries)
 		}
 	}
+
+	tree := widget.NewTree(
+		func(path widget.TreeNodeID) []widget.TreeNodeID {
+			if path == "" {
+				return []string{"Root"}
+			} else {
+				if path == "Root" {
+					return manager.Keys()
+				} else {
+					return entries[path].childrenPaths
+				}
+			}
+		},
+		func(path widget.TreeNodeID) bool {
+			if path == "" || path == "Root" {
+				return true
+			}
+			entry := entries[path]
+			if entry.key == "" {
+				return false
+			}
+			return entry.isParent
+		},
+		func(branch bool) fyne.CanvasObject {
+			key := widgets.NewText("Key")
+			typ := widget.NewSelect(types, func(s string) {
+			})
+			value := widgets.NewText("Value")
+
+			return container.NewHBox(key, layout.NewSpacer(), typ, layout.NewSpacer(), value)
+		},
+		func(path widget.TreeNodeID, branch bool, o fyne.CanvasObject) {
+			container, _ := o.(*fyne.Container)
+			key := container.Objects[0].(*widgets.Text)
+			typ := container.Objects[2].(*widget.Select)
+			value := container.Objects[4].(*widgets.Text)
+			if path == "Root" {
+				key.SetText("Root")
+				typ.Options = topTypes
+				typ.SetSelected(plistType)
+				length := manager.Length()
+				if length == 1 {
+					value.SetText("1 key/value entry")
+				} else {
+					value.SetText(fmt.Sprintf("%v key/value entries", length))
+				}
+			} else {
+				entry := entries[path]
+				if entry.key == "" {
+					key.SetText("N/A")
+					typ.SetSelected("N/A")
+					value.SetText("N/A")
+				} else {
+					t, v := GetType(entry)
+					key.SetText(entry.key)
+					typ.SetSelected(t)
+					value.SetText(v.display)
+				}
+			}
+			return
+		})
+
 	tree.OpenAllBranches()
 	w.SetTitle(filename)
 	w.SetContent(tree)
@@ -100,82 +164,6 @@ func main() {
 			w.Close()
 		}
 	})
-	tree := widget.NewTree(
-		func(path widget.TreeNodeID) []widget.TreeNodeID {
-			children := []string{}
-			if path == "" {
-				children = append(children, "Root")
-			} else {
-				if path == "Root" {
-					children = manager.Keys()
-				} else {
-					entry := entries[path]
-					children = entry.childrenPaths
-				}
-			}
-			return children
-		},
-		func(path widget.TreeNodeID) bool {
-			if path == "" || path == "Root" {
-				return true
-			}
-			entry := entries[path]
-			if &entry == nil {
-				return false
-			}
-			if entry.value == nil {
-				return true
-			}
-			return false
-		},
-		func(branch bool) fyne.CanvasObject {
-			key := widgets.NewText("Key")
-			keyEntry := widgets.NewEntry(key.Resource.Text)
-			keyEntry.Hide()
-			key.SetDoubleTapEvent(func(_ *fyne.PointEvent) {
-				key.Hide()
-				keyEntry.SetText(key.Resource.Text)
-				keyEntry.Show()
-			})
-			typ := widgets.NewText("Type")
-			value := widgets.NewText("Value")
-			valueEntry := widgets.NewEntry(value.Resource.Text)
-			valueEntry.Hide()
-			value.SetDoubleTapEvent(func(_ *fyne.PointEvent) {
-				value.Hide()
-				valueEntry.Show()
-			})
-
-			return container.New(layout.NewGridLayout(3), key, keyEntry, typ, value)
-		},
-		func(path widget.TreeNodeID, branch bool, o fyne.CanvasObject) {
-			container, _ := o.(*fyne.Container)
-			key := container.Objects[0].(*widgets.Text)
-			typ := container.Objects[2].(*widgets.Text)
-			value := container.Objects[3].(*widgets.Text)
-			if path == "Root" {
-				key.SetText("Root")
-				typ.SetText(plistType)
-				if manager.Length() == 1 {
-					value.SetText("1 key/value entries")
-				} else {
-					value.SetText(fmt.Sprintf("%v key/value entries", manager.Length()))
-				}
-			} else {
-				entry := entries[path]
-				if &entry == nil {
-					key.SetText("N/A")
-					typ.SetText("N/A")
-					value.SetText("N/A")
-				} else {
-					t, v := GetType(entry)
-					key.SetText(entry.key)
-					typ.SetText(t)
-					value.SetText(v.display)
-				}
-			}
-			return
-		})
 	text := canvas.NewText("Please upload a plist file", theme.TextColor())
 	text.Alignment = fyne.TextAlignCenter
 	text.TextSize = 25
@@ -186,7 +174,7 @@ func main() {
 			fmt.Println("Error opening file:", err)
 			return
 		}
-		entries = *ParsePlist(filename, w, tree, entries)
+		entries = *ParsePlist(filename, w, entries)
 	})
 
 	filemenu := fyne.NewMenu("File", fileitem)
@@ -198,8 +186,7 @@ func main() {
 	if filename == "" {
 		w.SetContent(text)
 	} else {
-		entries = *ParsePlist(filename, w, tree, entries)
+		entries = *ParsePlist(filename, w, entries)
 	}
-
 	w.ShowAndRun()
 }

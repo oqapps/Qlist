@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	valid "github.com/asaskevich/govalidator"
 	"github.com/iancoleman/strcase"
@@ -105,10 +106,15 @@ func GetType(entry Entry) (string, Value) {
 				if valid.IsInt(value.display) {
 					t = "Number"
 				} else {
-					data := entry.value.([]uint8)
-
-					value.display = dataString(data)
-					t = "Data"
+					ti, ok := entry.value.(time.Time)
+					if ok {
+						value.real = ti
+						value.display = ti.String()
+						t = "Date"
+					} else {
+						value.display = dataString(entry.value.([]uint8))
+						t = "Data"
+					}
 				}
 			}
 		}
