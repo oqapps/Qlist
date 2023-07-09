@@ -13,7 +13,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/layout"
 
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
@@ -94,7 +93,7 @@ func ParsePlist(filename string, w fyne.Window, entries Entries) *Entries {
 			typ1 := widgets.NewText("Type")
 			value := widgets.NewText("Value")
 
-			return container.NewHBox(key, layout.NewSpacer(), typ1, layout.NewSpacer(), value)
+			return container.NewGridWithColumns(3, key, typ1, value)
 		},
 		func(path widget.TreeNodeID, branch bool, o fyne.CanvasObject) {
 			container, _ := o.(*fyne.Container)
