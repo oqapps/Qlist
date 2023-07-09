@@ -67,7 +67,6 @@ func ParsePlist(filename string, w fyne.Window, entries Entries) *Entries {
 			Parse(key, plistData.Values[index], key, len(entries), entries)
 		}
 	}
-
 	tree := widget.NewTree(
 		func(path widget.TreeNodeID) []widget.TreeNodeID {
 			if path == "" {
@@ -92,15 +91,18 @@ func ParsePlist(filename string, w fyne.Window, entries Entries) *Entries {
 		},
 		func(branch bool) fyne.CanvasObject {
 			key := widgets.NewText("Key")
-			typ := widget.NewSelect(types, func(s string) {
-			})
+			typ1 := widgets.NewText("Type")
 			value := widgets.NewText("Value")
 
-			return container.NewHBox(key, layout.NewSpacer(), typ, layout.NewSpacer(), value)
+			return container.NewHBox(key, layout.NewSpacer(), typ1, layout.NewSpacer(), value)
 		},
 		func(path widget.TreeNodeID, branch bool, o fyne.CanvasObject) {
 			container, _ := o.(*fyne.Container)
 			key := container.Objects[0].(*widgets.Text)
+			container.Objects[2] = widget.NewSelect(types, func(s string) {
+				entry := entries[path]
+				entry.value = nil
+			})
 			typ := container.Objects[2].(*widget.Select)
 			value := container.Objects[4].(*widgets.Text)
 			if path == "Root" {
@@ -139,6 +141,7 @@ func main() {
 	entries := make(Entries)
 	a := app.New()
 	w := a.NewWindow("Qlist Plist Editor")
+
 	for _, a := range os.Args {
 		if b, _ := govalidator.IsFilePath(a); b {
 			if strings.HasSuffix(a, ".plist") {

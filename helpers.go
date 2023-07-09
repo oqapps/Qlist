@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -91,31 +90,23 @@ func GetType(entry Entry) (string, Value) {
 		}
 	} else {
 		value = Value{display: fmt.Sprintf("%v", entry.value), real: entry.value}
-		switch reflect.TypeOf(entry.value).Name() {
-		case "bool":
-			{
-				t = "Boolean"
-				value.display = strcase.ToCamel(value.display)
-			}
-		case "string":
-			{
-				t = "String"
-			}
-		default:
-			{
-				if valid.IsInt(value.display) {
-					t = "Number"
-				} else {
-					ti, ok := entry.value.(time.Time)
-					if ok {
-						value.real = ti
-						value.display = ti.String()
-						t = "Date"
-					} else {
-						value.display = dataString(entry.value.([]uint8))
-						t = "Data"
-					}
-				}
+		_, isBool := entry.value.(bool)
+		_, isString := entry.value.(string)
+		ti, isDate := entry.value.(time.Time)
+		if isBool {
+			t = "Boolean"
+			value.display = strcase.ToCamel(value.display)
+		} else if isString {
+			t = "String"
+		} else if isDate {
+			value.display = ti.String()
+			t = "Date"
+		} else {
+			if valid.IsInt(value.display) {
+				t = "Number"
+			} else {
+				value.display = dataString(entry.value.([]uint8))
+				t = "Data"
 			}
 		}
 	}
