@@ -32,40 +32,7 @@ var manager = Manager{}
 var types = []string{"String", "Number", "Data", "Dictionary", "Array", "Date", "Boolean"}
 var topTypes = []string{types[3], types[4]}
 
-func ParsePlist(filename string, w fyne.Window, entries Entries) *Entries {
-	content, err := os.ReadFile(filename)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return nil
-	}
-	plistData = plist.OrderedDict{}
-	arrayPlist = []interface{}{}
-	entries = make(Entries)
-	_, err = plist.Unmarshal(content, &plistData)
-	if err != nil {
-		_, e := plist.Unmarshal(content, &arrayPlist)
-		if e != nil {
-			fmt.Println("Error parsing dict plist data:", err)
-			fmt.Println("Error parsing array plist data:", e)
-			mack.Alert("Error", "Failed to parse plist", "critical")
-			w.Close()
-		} else {
-			fmt.Printf("[INFO] Parsed array plist %s\n", filename)
-			plistType = "Array"
-			for index, value := range arrayPlist {
-				key := fmt.Sprintf("%v", index)
-				path := strconv.Itoa(index)
-				entry := Parse(key, value, path, len(entries), entries)
-				entries[path] = entry
-			}
-		}
-	} else {
-		fmt.Printf("[INFO] Parsed dict plist %s\n", filename)
-		plistType = "Dictionary"
-		for index, key := range plistData.Keys {
-			Parse(key, plistData.Values[index], key, len(entries), entries)
-		}
-	}
+func CreateTree(entries Entries) *widget.Tree {
 	tree := widget.NewTree(
 		func(path widget.TreeNodeID) []widget.TreeNodeID {
 			if path == "" {
@@ -149,6 +116,44 @@ func ParsePlist(filename string, w fyne.Window, entries Entries) *Entries {
 		})
 
 	tree.OpenAllBranches()
+	return tree
+}
+
+func ParsePlist(filename string, w fyne.Window, entries Entries) *Entries {
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return nil
+	}
+	plistData = plist.OrderedDict{}
+	arrayPlist = []interface{}{}
+	entries = make(Entries)
+	_, err = plist.Unmarshal(content, &plistData)
+	if err != nil {
+		_, e := plist.Unmarshal(content, &arrayPlist)
+		if e != nil {
+			fmt.Println("Error parsing dict plist data:", err)
+			fmt.Println("Error parsing array plist data:", e)
+			mack.Alert("Error", "Failed to parse plist", "critical")
+			w.Close()
+		} else {
+			fmt.Printf("[INFO] Parsed array plist %s\n", filename)
+			plistType = "Array"
+			for index, value := range arrayPlist {
+				key := fmt.Sprintf("%v", index)
+				path := strconv.Itoa(index)
+				entry := Parse(key, value, path, len(entries), entries)
+				entries[path] = entry
+			}
+		}
+	} else {
+		fmt.Printf("[INFO] Parsed dict plist %s\n", filename)
+		plistType = "Dictionary"
+		for index, key := range plistData.Keys {
+			Parse(key, plistData.Values[index], key, len(entries), entries)
+		}
+	}
+	tree := CreateTree(entries)
 	w.SetTitle(filename)
 	w.SetContent(tree)
 	return &entries
@@ -156,8 +161,8 @@ func ParsePlist(filename string, w fyne.Window, entries Entries) *Entries {
 
 func main() {
 	entries := make(Entries)
-	a := app.New()
-	w := a.NewWindow("Qlist Plist Editor")
+	app := app.New()
+	window := app.NewWindow("Qlist Plist Editor")
 
 	for _, a := range os.Args {
 		if b, _ := govalidator.IsFilePath(a); b {
@@ -166,7 +171,7 @@ func main() {
 			}
 		}
 	}
-	w.SetCloseIntercept(func() {
+	window.SetCloseIntercept(func() {
 		if runtime.GOOS == "darwin" {
 			if len(plistData.Keys) > 0 {
 				response, _ := mack.AlertBox(mack.AlertOptions{
@@ -175,38 +180,44 @@ func main() {
 					Buttons: "No, Yes, Cancel",
 				})
 				if response.Clicked == "No" {
-					w.Close()
+					window.Close()
 				}
 			} else {
-				w.Close()
+				window.Close()
 			}
 		} else {
-			w.Close()
+			window.Close()
 		}
 	})
 	text := canvas.NewText("Please upload a plist file", theme.TextColor())
 	text.Alignment = fyne.TextAlignCenter
 	text.TextSize = 25
 
-	fileitem := fyne.NewMenuItem("Open", func() {
+	openFile := fyne.NewMenuItem("Open", func() {
 		filename, err := dialog.File().Filter("Property-List File", "plist").Load()
 		if err != nil {
 			fmt.Println("Error opening file:", err)
 			return
 		}
-		entries = *ParsePlist(filename, w, entries)
+		entries = *ParsePlist(filename, window, entries)
 	})
 
-	filemenu := fyne.NewMenu("File", fileitem)
+	newFile := fyne.NewMenuItem("New", func() {
+		entries = make(map[string]Entry)
+		tree := CreateTree(entries)
+		window.SetContent(tree)
+	})
+
+	filemenu := fyne.NewMenu("File", openFile, newFile)
 	mainmenu := fyne.NewMainMenu(filemenu)
-	w.SetMainMenu(mainmenu)
+	window.SetMainMenu(mainmenu)
 	resolution := screenresolution.GetPrimary()
-	w.Resize(fyne.Size{Width: float32(resolution.Width), Height: float32(resolution.Height)})
+	window.Resize(fyne.Size{Width: float32(resolution.Width), Height: float32(resolution.Height)})
 
 	if filename == "" {
-		w.SetContent(text)
+		window.SetContent(text)
 	} else {
-		entries = *ParsePlist(filename, w, entries)
+		entries = *ParsePlist(filename, window, entries)
 	}
-	w.ShowAndRun()
+	window.ShowAndRun()
 }
