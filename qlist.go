@@ -95,7 +95,7 @@ func ParsePlist(filename string, w fyne.Window, entries Entries) *Entries {
 
 			container := container.NewGridWithColumns(3, key, typ, value)
 			typeText, isText := container.Objects[1].(*widgets.Text)
-			if isText {
+			if isText && typeText.DoubleTapEvent == nil {
 				typeText.SetDoubleTapEvent(func(_ *fyne.PointEvent) {
 					path := container.Objects[0].(*widgets.Text).ID
 					sel := widget.NewSelect(types, func(s string) {
