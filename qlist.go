@@ -20,7 +20,7 @@ import (
 	"github.com/andybrewer/mack"
 	"github.com/asaskevich/govalidator"
 
-	//"github.com/fstanis/screenresolution"
+	"github.com/fstanis/screenresolution"
 
 	"github.com/oq-x/go-plist"
 	"github.com/sqweek/dialog"
@@ -211,8 +211,10 @@ func main() {
 	filemenu := fyne.NewMenu("File", openFile, newFile)
 	mainmenu := fyne.NewMainMenu(filemenu)
 	window.SetMainMenu(mainmenu)
-	//resolution := screenresolution.GetPrimary()
-	//window.Resize(fyne.Size{Width: float32(resolution.Width), Height: float32(resolution.Height)})
+	if runtime.GOOS == "linux" || runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		resolution := screenresolution.GetPrimary()
+		window.Resize(fyne.Size{Width: float32(resolution.Width), Height: float32(resolution.Height)})
+	}
 
 	if filename == "" {
 		window.SetContent(text)
