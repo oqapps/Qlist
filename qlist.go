@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 
 	"fyne.io/fyne/v2/container"
+	fdialog "fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/andybrewer/mack"
@@ -194,10 +195,13 @@ func main() {
 	text.TextSize = 25
 
 	openFile := fyne.NewMenuItem("Open", func() {
-		filename, err := dialog.File().Filter("Property-List File", "plist").Load()
-		if err != nil {
-			fmt.Println("Error opening file:", err)
-			return
+		var filename string
+		if runtime.GOOS == "android" || runtime.GOOS == "ios" {
+			fdialog.NewFileOpen(func(uc fyne.URIReadCloser, err error) {
+				filename = uc.URI().String()
+			}, window)
+		} else {
+			filename, _ = dialog.File().Filter("Property-List File", "plist").Load()
 		}
 		entries = *ParsePlist(filename, window, entries)
 	})
