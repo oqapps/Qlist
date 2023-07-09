@@ -15,7 +15,14 @@ type Value struct {
 	display string
 }
 
-type Manager struct{}
+type Display struct {
+	value    Value
+	typeText string
+}
+
+type Manager struct {
+	Displays map[string]Display
+}
 
 func (manager Manager) Type() string {
 	if len(arrayPlist) != 0 {
@@ -51,6 +58,19 @@ func (manager Manager) Keys() []string {
 	default:
 		return children
 	}
+}
+
+func (manager Manager) Display(entry Entry) Display {
+	if manager.Displays == nil {
+		manager.Displays = make(map[string]Display)
+	}
+	display := manager.Displays[entry.path]
+	if display.typeText == "" {
+		typeText, value := GetType(entry)
+		display = Display{typeText: typeText, value: value}
+		manager.Displays[entry.path] = display
+	}
+	return display
 }
 
 func dataString(data []byte) string {

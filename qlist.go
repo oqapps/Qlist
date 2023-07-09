@@ -90,24 +90,44 @@ func ParsePlist(filename string, w fyne.Window, entries Entries) *Entries {
 		},
 		func(branch bool) fyne.CanvasObject {
 			key := widgets.NewText("Key")
-			typ1 := widgets.NewText("Type")
+			typ := widgets.NewText("Type")
 			value := widgets.NewText("Value")
 
-			return container.NewGridWithColumns(3, key, typ1, value)
+			container := container.NewGridWithColumns(3, key, typ, value)
+			typeText, isText := container.Objects[1].(*widgets.Text)
+			if isText {
+				typeText.SetDoubleTapEvent(func(_ *fyne.PointEvent) {
+					path := container.Objects[0].(*widgets.Text).ID
+					sel := widget.NewSelect(types, func(s string) {
+						container.Objects[1] = typeText
+					})
+					if path == "" {
+						sel.SetSelected(plistType)
+						sel.Options = topTypes
+					} else {
+						sel.SetSelected(typeText.Resource.Text)
+					}
+					container.Objects[1] = sel
+					container.Refresh()
+				})
+			}
+			return container
 		},
 		func(path widget.TreeNodeID, branch bool, o fyne.CanvasObject) {
 			container, _ := o.(*fyne.Container)
 			key := container.Objects[0].(*widgets.Text)
-			container.Objects[1] = widget.NewSelect(types, func(s string) {
-				entry := entries[path]
-				entry.value = nil
-			})
-			typ := container.Objects[1].(*widget.Select)
+			typeS, isSelect := container.Objects[1].(*widget.Select)
+			typeT, isText := container.Objects[1].(*widgets.Text)
 			value := container.Objects[2].(*widgets.Text)
 			if path == "Root" {
+				key.SetID("")
 				key.SetText("Root")
-				typ.Options = topTypes
-				typ.SetSelected(plistType)
+				if isSelect {
+					typeS.Options = topTypes
+					typeS.SetSelected(plistType)
+				} else if isText {
+					typeT.SetText(plistType)
+				}
 				length := manager.Length()
 				if length == 1 {
 					value.SetText("1 key/value entry")
@@ -116,18 +136,16 @@ func ParsePlist(filename string, w fyne.Window, entries Entries) *Entries {
 				}
 			} else {
 				entry := entries[path]
-				if entry.key == "" {
-					key.SetText("N/A")
-					typ.SetSelected("N/A")
-					value.SetText("N/A")
-				} else {
-					t, v := GetType(entry)
-					key.SetText(entry.key)
-					typ.SetSelected(t)
-					value.SetText(v.display)
+				display := manager.Display(entry)
+				key.SetID(entry.path)
+				key.SetText(entry.key)
+				if isSelect {
+					typeS.SetSelected(display.typeText)
+				} else if isText {
+					typeT.SetText(display.typeText)
 				}
+				value.SetText(display.value.display)
 			}
-			return
 		})
 
 	tree.OpenAllBranches()

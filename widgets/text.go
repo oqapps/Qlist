@@ -10,6 +10,7 @@ import (
 type Text struct {
 	widget.BaseWidget
 	Resource *canvas.Text
+	ID       string
 
 	DoubleTapEvent func(_ *fyne.PointEvent)
 }
@@ -17,6 +18,10 @@ type Text struct {
 func (t *Text) SetText(text string) {
 	t.Resource.Text = text
 	t.Refresh()
+}
+
+func (t *Text) SetID(id string) {
+	t.ID = id
 }
 
 func (t *Text) DoubleTapped(event *fyne.PointEvent) {
@@ -35,7 +40,6 @@ func (t *Text) CreateRenderer() fyne.WidgetRenderer {
 
 func NewText(input string) *Text {
 	resource := canvas.NewText(input, theme.TextColor())
-	//resource := widget.NewLabel(input)
 	text := &Text{Resource: resource}
 	text.ExtendBaseWidget(text)
 	return text
