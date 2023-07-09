@@ -98,12 +98,12 @@ func ParsePlist(filename string, w fyne.Window, entries Entries) *Entries {
 		func(path widget.TreeNodeID, branch bool, o fyne.CanvasObject) {
 			container, _ := o.(*fyne.Container)
 			key := container.Objects[0].(*widgets.Text)
-			container.Objects[2] = widget.NewSelect(types, func(s string) {
+			container.Objects[1] = widget.NewSelect(types, func(s string) {
 				entry := entries[path]
 				entry.value = nil
 			})
-			typ := container.Objects[2].(*widget.Select)
-			value := container.Objects[4].(*widgets.Text)
+			typ := container.Objects[1].(*widget.Select)
+			value := container.Objects[2].(*widgets.Text)
 			if path == "Root" {
 				key.SetText("Root")
 				typ.Options = topTypes
