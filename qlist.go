@@ -21,10 +21,10 @@ import (
 	"github.com/andybrewer/mack"
 	"github.com/asaskevich/govalidator"
 
-	//"github.com/fstanis/screenresolution"
+	"github.com/fstanis/screenresolution"
 
 	"github.com/oq-x/go-plist"
-	// "github.com/sqweek/dialog"
+	ndialog "github.com/sqweek/dialog"
 )
 
 var plistType string
@@ -82,7 +82,6 @@ func CreateTree(entries Entries) *widget.Tree {
 			typeSelect, isSelect := container.Objects[1].(*widget.Select)
 			typeText, isText := container.Objects[1].(*widgets.Text)
 			/*if isSelect {
-				fmt.Println("is select!")
 				var currentType string
 				var entry Entry
 				var display Display
@@ -134,7 +133,6 @@ func CreateTree(entries Entries) *widget.Tree {
 			}*/
 			value := container.Objects[2].(*widgets.Text)
 			if path == "Root" {
-				key.SetID("")
 				key.SetText("Root")
 				if isSelect {
 					typeSelect.Options = topTypes
@@ -242,18 +240,11 @@ func main() {
 			} else {
 				dialog = fdialog.NewCustomWithoutButtons("Do you want to create this file?", container.NewWithoutLayout(), window)
 				yesButton = widget.NewButtonWithIcon("Create", theme.ConfirmIcon(), func() {
-					var filename string
-					//var err error
-					//if runtime.GOOS == "android" || runtime.GOOS == "ios" {
-					fdialog.NewFileSave(func(uc fyne.URIWriteCloser, err error) {
-						filename = uc.URI().String()
-					}, window)
-					/*} else {
-						filename, err = ndialog.File().Filter("Property-List File", "plist").SetStartFile("Untitled.plist").Save()
-						if err != nil {
-							dialog.Hide()
-						}
-					}*/
+					filename, err := ndialog.File().Filter("Property-List File", "plist").SetStartFile("Untitled.plist").Save()
+					if err != nil {
+						dialog.Hide()
+					}
+
 					data := ParseEntries(entries)
 					file, _ := os.Create(filename)
 					plist.NewEncoder(file).Encode(data)
@@ -278,17 +269,11 @@ func main() {
 	text.TextSize = 25
 
 	openFile := fyne.NewMenuItem("Open", func() {
-		//if runtime.GOOS == "android" || runtime.GOOS == "ios" {
-		fdialog.NewFileOpen(func(uc fyne.URIReadCloser, err error) {
-			selectedFilePath = uc.URI().String()
-		}, window)
-		/*} else {
-			var err error
-			selectedFilePath, err = ndialog.File().Filter("Property-List File", "plist").Load()
-			if err != nil {
-				return
-			}
-		}*/
+		var err error
+		selectedFilePath, err = ndialog.File().Filter("Property-List File", "plist").Load()
+		if err != nil {
+			return
+		}
 		entries = *ParsePlist(selectedFilePath, window, entries)
 	})
 
@@ -303,10 +288,8 @@ func main() {
 	filemenu := fyne.NewMenu("File", openFile, newFile)
 	mainmenu := fyne.NewMainMenu(filemenu)
 	window.SetMainMenu(mainmenu)
-	//if runtime.GOOS == "linux" || runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
-	//	resolution := screenresolution.GetPrimary()
-	//	window.Resize(fyne.Size{Width: float32(resolution.Width), Height: float32(resolution.Height)})
-	//}
+	resolution := screenresolution.GetPrimary()
+	window.Resize(fyne.Size{Width: float32(resolution.Width), Height: float32(resolution.Height)})
 
 	if selectedFilePath == "" {
 		window.SetContent(text)
