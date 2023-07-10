@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/asaskevich/govalidator"
 	valid "github.com/asaskevich/govalidator"
 	"github.com/iancoleman/strcase"
 )
@@ -24,21 +24,11 @@ type Manager struct {
 	Displays map[string]Display
 }
 
-func (manager Manager) Type() string {
-	if len(arrayPlist) != 0 {
-		return "array"
-	} else if len(plistData.Keys) != 0 {
-		return "dict"
-	} else {
-		return "unknown"
-	}
-}
-
-func (manager Manager) Length() int {
-	switch manager.Type() {
-	case "array":
+/*func (manager Manager) Length() int {
+	switch plistType {
+	case "Array":
 		return len(arrayPlist)
-	case "dict":
+	case "Dictionary":
 		return len(plistData.Keys)
 	default:
 		return 0
@@ -47,18 +37,18 @@ func (manager Manager) Length() int {
 
 func (manager Manager) Keys() []string {
 	children := []string{}
-	switch manager.Type() {
-	case "array":
+	switch plistType {
+	case "Array":
 		for i := 0; i < len(arrayPlist); i++ {
 			children = append(children, strconv.Itoa(i))
 		}
 		return children
-	case "dict":
+	case "Dictionary":
 		return plistData.Keys
 	default:
 		return children
 	}
-}
+}*/
 
 func (manager Manager) Display(entry Entry) Display {
 	if manager.Displays == nil {
@@ -66,11 +56,25 @@ func (manager Manager) Display(entry Entry) Display {
 	}
 	display := manager.Displays[entry.path]
 	if display.typeText == "" {
-		typeText, value := GetType(entry)
+		typeText, value := manager.GetType(entry)
 		display = Display{typeText: typeText, value: value}
 		manager.Displays[entry.path] = display
 	}
 	return display
+}
+
+func GetFileName(path string) string {
+	unix := govalidator.IsUnixFilePath(path)
+	windows := govalidator.IsWinFilePath(path)
+	var sp []string
+	if windows {
+		sp = strings.Split(path, "\\")
+	} else if unix {
+		sp = strings.Split(path, "/")
+	} else {
+		return "Untitled.plist"
+	}
+	return sp[len(sp)-1]
 }
 
 func dataString(data []byte) string {
@@ -86,7 +90,7 @@ func dataString(data []byte) string {
 	return builder.String()
 }
 
-func GetType(entry Entry) (string, Value) {
+func (manager Manager) GetType(entry Entry) (string, Value) {
 	var t string
 	var value Value
 	if entry.value == nil {

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/oq-x/go-plist"
 )
@@ -34,6 +35,32 @@ func GetEntry(entries Entries, index int) Entry {
 	return entry
 }
 
+func ValueToDict(entry Entry) plist.OrderedDict {
+	dict := plist.OrderedDict{}
+	for _, e := range entry.children {
+		dict.Keys = append(dict.Keys, e.key)
+		if e.isParent {
+			dict.Values = append(dict.Values, ValueToDict(e))
+		} else {
+			dict.Values = append(dict.Values, e.value)
+		}
+	}
+	return dict
+}
+
+func ParseEntries(entries Entries) plist.OrderedDict {
+	dict := plist.OrderedDict{}
+	for _, entry := range entries {
+		dict.Keys = append(dict.Keys, entry.key)
+		if entry.isParent {
+			dict.Values = append(dict.Values, ValueToDict(entry))
+		} else {
+			dict.Values = append(dict.Values, entry.value)
+		}
+	}
+	return dict
+}
+
 func Get(dict plist.OrderedDict, key string) interface{} {
 	var index int
 	for i, k := range dict.Keys {
@@ -54,53 +81,15 @@ func Get(dict plist.OrderedDict, key string) interface{} {
 		}
 		element = (element.(map[string]interface{}))[p]
 	}
-}
-
-func (entry Entry) SetKey(value string) {
-	var parentEntry Entry
-	for _, entry := range entries {
-		var p []string
-		for index, value := range entry.path {
-			if index == len(entry.path)-1 {
-				continue
-			} else {
-				p = append(p, value)
-			}
-		}
-		for index, value := range p {
-			if entry.path[index] != value {
-				return
-			}
-		}
-		parentEntry = entry
-	}
-	for index, child := range parentEntry.children {
-		if child.key == entry.key {
-			parentEntry.children[index] = child
-			entries[parentEntry.index] = parentEntry
-			break
-		}
-	}
-	var element = Get(plistData, entry.path[0])
-	for index, p := range entry.path {
-		if index == 0 {
-			continue
-		}
-		if index == len(entry.path)-1 {
-			continue
-		}
-
-		element, err := element.(map[string]interface{})
-		if !err {
-			break
-		} else {
-			element = element[p].(map[string]interface{})
-		}
-	}
-	data := (element.(map[string]interface{}))[entry.key]
-	delete(element.(map[string]interface{}), entry.key)
-	(element.(map[string]interface{}))[value] = data
 }*/
+
+func (entry Entry) SetKey(entries Entries, value string) {
+	entry.key = value
+	pathSp := strings.Split(entry.path, "\\-\\")
+	pathSp[len(pathSp)-1] = entry.key
+	entry.path = strings.Join(pathSp, "\\-\\")
+	entries[entry.path] = entry
+}
 
 func AppendToPath(path string, index ...string) string {
 	for _, p := range index {
