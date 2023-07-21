@@ -22,26 +22,13 @@ public:
         m_key = key;
         m_type = type;
         m_value = value;
-
-        m_container = false;
-    }
-
-    Node(Node *parent,
-         const wxString &branch)
-    {
-        m_parent = parent;
-        m_key = "N/A";
-        m_type = "N/A";
-        m_value = "N/A";
-
-        m_container = true;
     }
 
     ~Node() = default;
 
     bool IsContainer() const
     {
-        return m_container;
+        return m_children.size() > 0;
     }
 
     Node *GetParent()
@@ -60,6 +47,13 @@ public:
     {
         m_children.insert(m_children.begin() + n, NodePtr(child));
     }
+    Node *AddEntry(const wxString &key, const wxString &type,
+                   const wxString &value)
+    {
+        Node *node = new Node(this, key, type, value);
+        m_children.push_back(NodePtr(node));
+        return node;
+    }
     void Append(Node *child)
     {
         m_children.push_back(NodePtr(child));
@@ -69,91 +63,126 @@ public:
         return m_children.size();
     }
 
-public: // public to avoid getters/setters
+public:
     wxString m_key;
     wxString m_type;
     wxString m_value;
-
-    bool m_container;
 
 private:
     Node *m_parent;
     NodePtrArray m_children;
 };
 
-class TreeModel : public wxDataViewModel
+class Model : public wxDataViewModel
 {
 public:
+    Model();
+    ~Model()
+    {
+        delete m_root;
+    }
     virtual void GetValue(wxVariant &variant,
                           const wxDataViewItem &item, unsigned int col) const override;
     virtual bool SetValue(const wxVariant &variant,
                           const wxDataViewItem &item, unsigned int col) override;
-
     virtual wxDataViewItem GetParent(const wxDataViewItem &item) const override;
     virtual bool IsContainer(const wxDataViewItem &item) const override;
     virtual unsigned int GetChildren(const wxDataViewItem &parent,
                                      wxDataViewItemArray &array) const override;
-    virtual Node Add();
+    Node *AddRootEntry(const wxString &key, const wxString &type,
+                       const wxString &value) const;
 
 private:
-    Node *root;
+    Node *m_root;
 };
 
-void TreeModel::GetValue(wxVariant &variant,
-                         const wxDataViewItem &item, unsigned int col) const
+Model::Model()
+{
+    m_root = new Node(nullptr, "Root", "Dictionary", "12 children");
+};
+Node *Model::AddRootEntry(const wxString &key, const wxString &type,
+                          const wxString &value) const
+{
+    Node *node = new Node(m_root, key, type, value);
+    m_root->Append(node);
+    return node;
+};
+
+void Model::GetValue(wxVariant &variant,
+                     const wxDataViewItem &item, unsigned int col) const
 {
     wxASSERT(item.IsOk());
 
-    variant = "HI!";
-}
+    Node *node = (Node *)item.GetID();
+    switch (col)
+    {
+    case 0:
+        variant = node->m_key;
+        break;
+    case 1:
+        variant = node->m_type;
+        break;
+    case 2:
+        variant = node->m_value;
+        break;
+    default:
+        wxLogError("Model::GetValue: wrong column %d", col);
+    }
+};
 
-Node TreeModel::Add()
+bool Model::SetValue(const wxVariant &variant,
+                     const wxDataViewItem &item, unsigned int col)
 {
-    Node *n = new Node(root, "Classical music");
-    return *n;
-}
+    wxASSERT(item.IsOk());
 
-bool TreeModel::SetValue(const wxVariant &variant,
-                         const wxDataViewItem &item, unsigned int col)
-{
-    // wxASSERT(item.IsOk());
-
-    return true;
-}
-
-wxDataViewItem TreeModel::GetParent(const wxDataViewItem &item) const
-{
-    // the invisible root node has no parent
-    if (!item.IsOk())
-        return wxDataViewItem(0);
-
-    /*Node *node = (Node*) item.GetID();
-
-    // "MyMusic" also has no parent
-    if (node == m_root)
-        return wxDataViewItem(0);
-
-    return wxDataViewItem( (void*) node->GetParent() );*/
-    return wxDataViewItem(0);
-}
-
-bool TreeModel::IsContainer(const wxDataViewItem &item) const
-{
-    // the invisible root node can have children
-    // (in our model always "MyMusic")
-    if (!item.IsOk())
+    Node *node = (Node *)item.GetID();
+    switch (col)
+    {
+    case 0:
+        node->m_key = variant.GetString();
+        return true;
+    case 1:
+        node->m_type = variant.GetString();
+        return true;
+    case 2:
+        node->m_value = variant.GetString();
         return true;
 
+    default:
+        wxLogError("Model::SetValue: wrong column");
+    }
     return false;
 }
 
-unsigned int TreeModel::GetChildren(const wxDataViewItem &parent,
-                                    wxDataViewItemArray &array) const
+wxDataViewItem Model::GetParent(const wxDataViewItem &item) const
 {
-    /*Node *node = (Node*) parent.GetID();
+    if (!item.IsOk())
+        return wxDataViewItem(0);
+
+    Node *node = (Node *)item.GetID();
+
+    if (node == m_root)
+        return wxDataViewItem(0);
+
+    return wxDataViewItem((void *)node->GetParent());
+}
+
+bool Model::IsContainer(const wxDataViewItem &item) const
+{
+    if (!item.IsOk())
+        return true;
+
+    Node *node = (Node *)item.GetID();
+    return node->IsContainer();
+}
+
+unsigned int Model::GetChildren(const wxDataViewItem &parent,
+                                wxDataViewItemArray &array) const
+{
+    Node *node = (Node *)parent.GetID();
     if (!node)
     {
-        array.Add( wxDataViewItem( (void*) m_root ) );
+        array.Add(wxDataViewItem((void *)m_root));
         return 1;
     }
 
@@ -162,13 +191,12 @@ unsigned int TreeModel::GetChildren(const wxDataViewItem &parent,
         return 0;
     }
 
-    for ( const auto& child : node->GetChildren() )
+    for (const auto &child : node->GetChildren())
     {
-        array.Add( wxDataViewItem( child.get() ) );
+        array.Add(wxDataViewItem(child.get()));
     }
 
-    return array.size();*/
-    return 0;
+    return array.size();
 }
 
 class MyApp : public wxApp
@@ -218,20 +246,11 @@ Frame::Frame(const wxString &title, const wxPoint &pos, const wxSize &size)
     menuBar->Append(menuFile, "&File");
     SetMenuBar(menuBar);
     wxDataViewCtrl *dataview = new wxDataViewCtrl(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxDV_ROW_LINES);
-    wxDataViewTextRenderer *tr =
-        new wxDataViewTextRenderer("string", wxDATAVIEW_CELL_INERT);
-    wxDataViewColumn *keycol =
-        new wxDataViewColumn("Key", tr, 0, 180);
-    wxDataViewColumn *typecol =
-        new wxDataViewColumn("Type", tr, 0, 100);
-    wxDataViewColumn *valuecol =
-        new wxDataViewColumn("Value", tr, 0, 180);
-    dataview->AppendColumn(keycol);
-    dataview->AppendColumn(typecol);
-    dataview->AppendColumn(valuecol);
-    TreeModel *model = new TreeModel;
-    model->Add();
-    wxDataViewItem *i = new wxDataViewItem;
+    dataview->AppendTextColumn("Key", 0);
+    dataview->AppendTextColumn("Type", 1);
+    dataview->AppendTextColumn("Value", 2);
+    Model *model = new Model;
+    model->AddRootEntry("hi", "hi1", "hi2"); //->AddEntry("hi2", "hi3", "hi4");
     dataview->AssociateModel(model);
 }
 void Frame::OnExit(wxCommandEvent &event)
@@ -246,8 +265,8 @@ void Frame::OnAbout(wxCommandEvent &event)
 void Frame::OnFileOpen(wxCommandEvent &event)
 {
     wxFileDialog
-        openFileDialog(this, "", "", "",
-                       "Property-List files (*.plist)|*.plist", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
-    if (openFileDialog.ShowModal() == wxID_CANCEL)
-        return;
+        openFileDialog(this, _("Open Property-List file"), wxEmptyString, wxEmptyString,
+                       _("Property-List file|*.plist"), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+    if (openFileDialog.ShowModal() == wxID_OK)
+        cout << "hey!";
 }

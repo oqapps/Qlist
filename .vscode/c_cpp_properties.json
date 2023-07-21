@@ -13,7 +13,7 @@
               "__WXOSX__"
           ],
           "macFrameworkPath": [],
-          "compilerPath": "/usr/bin/clang",
+          "compilerPath": "/usr/local/bin/g++-13",
           "cStandard": "c11",
           "cppStandard": "c++17",
           "intelliSenseMode": "clang-x64"
