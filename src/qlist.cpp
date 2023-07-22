@@ -1,15 +1,45 @@
 #include <iostream>
 #include <wx/wxprec.h>
 #include <wx/filedlg.h>
+#include <fstream>
+#include <map>
 #include <wx/dataview.h>
+#include "rapidxml.hpp"
 #ifndef WX_PRECOMP
 #include <wx/wx.h>
 #endif
 
-using namespace std;
+rapidxml::xml_document<> doc;
+rapidxml::xml_node<> *root_node;
+
+static const std::string base64_chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz"
+    "0123456789+/";
+
 class Node;
-using NodePtr = unique_ptr<Node>;
-using NodePtrArray = vector<NodePtr>;
+using NodePtr = std::unique_ptr<Node>;
+using NodePtrArray = std::vector<NodePtr>;
+
+std::string getDisplayType(char *data)
+{
+    std::string str(data);
+    if (str == "dict")
+        return "Dictionary";
+    if (str == "array")
+        return "Array";
+    if (str == "string")
+        return "String";
+    if (str == "integer" || str == "real")
+        return "Number";
+    if (str == "data")
+        return "Data";
+    if (str == "false" || str == "true")
+        return "Boolean";
+    if (str == "date")
+        return "Date";
+    return str;
+}
 
 class Node
 {
@@ -87,10 +117,12 @@ public:
                           const wxDataViewItem &item, unsigned int col) override;
     virtual wxDataViewItem GetParent(const wxDataViewItem &item) const override;
     virtual bool IsContainer(const wxDataViewItem &item) const override;
+    virtual wxDataViewItem GetRoot() const;
     virtual unsigned int GetChildren(const wxDataViewItem &parent,
                                      wxDataViewItemArray &array) const override;
     Node *AddRootEntry(const wxString &key, const wxString &type,
                        const wxString &value) const;
+    virtual bool HasContainerColumns(const wxDataViewItem &item) const override;
 
 private:
     Node *m_root;
@@ -107,6 +139,11 @@ Node *Model::AddRootEntry(const wxString &key, const wxString &type,
     m_root->Append(node);
     return node;
 };
+
+bool Model::HasContainerColumns(const wxDataViewItem &item) const
+{
+    return true;
+}
 
 void Model::GetValue(wxVariant &variant,
                      const wxDataViewItem &item, unsigned int col) const
@@ -129,6 +166,11 @@ void Model::GetValue(wxVariant &variant,
         wxLogError("Model::GetValue: wrong column %d", col);
     }
 };
+
+wxDataViewItem Model::GetRoot() const
+{
+    return wxDataViewItem((void *)m_root);
+}
 
 bool Model::SetValue(const wxVariant &variant,
                      const wxDataViewItem &item, unsigned int col)
@@ -213,23 +255,148 @@ private:
     void OnFileOpen(wxCommandEvent &event);
     void OnExit(wxCommandEvent &event);
     void OnAbout(wxCommandEvent &event);
-    wxDataViewCtrl *tree;
+    wxDataViewCtrl *dataview;
+    Model *model;
     wxDECLARE_EVENT_TABLE();
 };
+
 enum
 {
     ID_FILE = 1,
     ID_NEW = 2
 };
+
 wxBEGIN_EVENT_TABLE(Frame, wxFrame)
     EVT_MENU(ID_FILE, Frame::OnFileOpen)
         EVT_MENU(wxID_EXIT, Frame::OnExit)
             EVT_MENU(wxID_ABOUT, Frame::OnAbout)
                 wxEND_EVENT_TABLE()
                     wxIMPLEMENT_APP(MyApp);
+
+std::string dataString(std::string data)
+{
+    std::string str = "";
+    for (int i = 0; i < data.length(); i++)
+    {
+        char buffer[1];
+        str += snprintf(buffer, 1, "%02X", data[i]);
+        if ((i + 1) % 4 == 0 && i != data.length() - 1)
+        {
+            str += " ";
+        }
+    }
+    return str;
+}
+
+static inline bool is_base64(unsigned char c)
+{
+    return (isalnum(c) || (c == '+') || (c == '/'));
+}
+
+std::string base64_decode(std::string const &encoded_string)
+{
+    int in_len = encoded_string.size();
+    int i = 0;
+    int j = 0;
+    int in_ = 0;
+    unsigned char char_array_4[4], char_array_3[3];
+    std::string ret;
+    while (in_len-- && (encoded_string[in_] != '=') && is_base64(encoded_string[in_]))
+    {
+        char_array_4[i++] = encoded_string[in_];
+        in_++;
+        if (i == 4)
+        {
+            for (i = 0; i < 4; i++)
+                char_array_4[i] = base64_chars.find(char_array_4[i]);
+
+            char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+            char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+            char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+            for (i = 0; (i < 3); i++)
+                ret += char_array_3[i];
+            i = 0;
+        }
+    }
+
+    if (i)
+    {
+        for (j = i; j < 4; j++)
+            char_array_4[j] = 0;
+
+        for (j = 0; j < 4; j++)
+            char_array_4[j] = base64_chars.find(char_array_4[j]);
+
+        char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+        char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+        char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+        for (j = 0; (j < i - 1); j++)
+            ret += char_array_3[j];
+    }
+
+    return ret;
+}
+
+Node *AddNodes(Node *treeNode, rapidxml::xml_node<char> *node, std::string k)
+{
+    int index = 0;
+    if (k == "array")
+    {
+        for (rapidxml::xml_node<> *n = node->first_node(); n; n = n->next_sibling())
+        {
+            std::string key = std::string(n->name());
+            std::string value = n->value();
+
+            Node *tn = treeNode->AddEntry(std::to_string(index), getDisplayType(n->name()), value);
+            if (std::string(n->name()) == "true")
+            {
+                tn->m_value = "True";
+            }
+            else if (std::string(n->name()) == "false")
+            {
+                tn->m_value = "False";
+            }
+            tn = AddNodes(tn, n, key);
+
+            index += 1;
+        }
+    }
+    else
+    {
+        for (rapidxml::xml_node<> *n = node->first_node(); n; n = n->next_sibling())
+        {
+            std::string key = std::string(n->name());
+            if (key != "key")
+            {
+                continue;
+            }
+            else
+            {
+                std::string value = std::string(n->next_sibling()->value());
+                if (std::string(n->next_sibling()->name()) == "data")
+                {
+                }
+                Node *tn = treeNode->AddEntry(n->value(), getDisplayType(n->next_sibling()->name()), value);
+                if (std::string(n->next_sibling()->name()) == "true")
+                {
+                    tn->m_value = "True";
+                }
+                else if (std::string(n->next_sibling()->name()) == "false")
+                {
+                    tn->m_value = "False";
+                }
+                tn = AddNodes(tn, n->next_sibling(), n->next_sibling()->name());
+            }
+        }
+    }
+    return treeNode;
+}
+
 bool MyApp::OnInit()
 {
-    Frame *frame = new Frame("Qlist", wxPoint(50, 50), wxSize(550, 450));
+    Frame *frame = new Frame("Qlist", wxPoint(50, 50), wxSize(750, 650));
     frame->Show(true);
     return true;
 }
@@ -245,13 +412,21 @@ Frame::Frame(const wxString &title, const wxPoint &pos, const wxSize &size)
     wxMenuBar *menuBar = new wxMenuBar;
     menuBar->Append(menuFile, "&File");
     SetMenuBar(menuBar);
-    wxDataViewCtrl *dataview = new wxDataViewCtrl(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxDV_ROW_LINES);
-    dataview->AppendTextColumn("Key", 0);
-    dataview->AppendTextColumn("Type", 1);
+    dataview = new wxDataViewCtrl(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxDV_ROW_LINES);
+    dataview->AppendTextColumn("Key", 0, wxDATAVIEW_CELL_EDITABLE, (40.0 / 100.0) * size.GetWidth());
+    wxArrayString *choices = new wxArrayString();
+    choices->Add("Array");
+    choices->Add("Dictionary");
+    choices->Add("String");
+    choices->Add("Number");
+    choices->Add("Data");
+    choices->Add("Date");
+    choices->Add("Boolean");
+    wxDataViewChoiceRenderer *choice = new wxDataViewChoiceRenderer(*choices);
+    wxDataViewColumn *typeColumn = new wxDataViewColumn("Type", choice, 1);
+    dataview->AppendColumn(typeColumn);
     dataview->AppendTextColumn("Value", 2);
-    Model *model = new Model;
-    model->AddRootEntry("hi", "hi1", "hi2"); //->AddEntry("hi2", "hi3", "hi4");
-    dataview->AssociateModel(model);
+    model = new Model();
 }
 void Frame::OnExit(wxCommandEvent &event)
 {
@@ -264,9 +439,28 @@ void Frame::OnAbout(wxCommandEvent &event)
 }
 void Frame::OnFileOpen(wxCommandEvent &event)
 {
-    wxFileDialog
-        openFileDialog(this, _("Open Property-List file"), wxEmptyString, wxEmptyString,
-                       _("Property-List file|*.plist"), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+    wxFileDialog openFileDialog(this, _("Open Property-List file"), wxEmptyString, wxEmptyString, _("Property-List file|*.plist"), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (openFileDialog.ShowModal() == wxID_OK)
-        cout << "hey!";
+    {
+
+        std::ifstream PlistFile(openFileDialog.GetPath());
+        std::vector<char> buffer((std::istreambuf_iterator<char>(PlistFile)), std::istreambuf_iterator<char>());
+        buffer.push_back('\0');
+        doc.parse<0>(&buffer[0]);
+        for (rapidxml::xml_node<> *node = doc.first_node("plist")->first_node("dict")->first_node(); node; node = node->next_sibling())
+        {
+            if (strcmp(node->name(), "key"))
+            {
+                continue;
+            }
+            Node *treeNode = model->AddRootEntry(node->value(), getDisplayType(node->next_sibling()->name()), node->next_sibling()->value());
+            treeNode = AddNodes(treeNode, node->next_sibling(), std::string(node->next_sibling()->name()));
+        }
+        dataview->AssociateModel(model);
+        dataview->ExpandChildren(model->GetRoot());
+    }
+    else
+    {
+        return;
+    }
 }

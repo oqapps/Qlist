@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
 
 project(plist LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 19)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ExternalProject base
@@ -11,6 +11,7 @@ set_property(DIRECTORY PROPERTY EP_BASE ${CMAKE_BINARY_DIR}/subprojects)
 set(STAGED_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/stage)
 
 add_subdirectory(thirdparty)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/build/subprojects/Build/PlistCpp_external/src/ ${CMAKE_CURRENT_SOURCE_DIR}/build/subprojects/Build/PlistCpp_external/include/boost)
 
 include(ExternalProject)
 ExternalProject_Add(${PROJECT_NAME}_core
