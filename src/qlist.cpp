@@ -110,20 +110,18 @@ public:
     {
         return m_children.at(n).get();
     }
-    void Insert(Node *child, unsigned int n)
-    {
-        m_children.insert(m_children.begin() + n, NodePtr(child));
-    }
     Node *AddEntry(const wxString &key, const wxString &type,
                    const wxString &value)
     {
         Node *node = new Node(this, key, type, value);
         m_children.push_back(NodePtr(node));
+        m_value = std::to_string(m_children.size()) + " children";
         return node;
     }
     void Append(Node *child)
     {
         m_children.push_back(NodePtr(child));
+        m_value = std::to_string(m_children.size()) + " children";
     }
     unsigned int GetChildCount() const
     {
@@ -155,6 +153,8 @@ public:
     virtual wxDataViewItem GetParent(const wxDataViewItem &item) const override;
     virtual bool IsContainer(const wxDataViewItem &item) const override;
     virtual wxDataViewItem GetRoot() const;
+    virtual void DeleteAll();
+    virtual void SetPlistType(const std::string &type);
     virtual unsigned int GetChildren(const wxDataViewItem &parent,
                                      wxDataViewItemArray &array) const override;
     Node *AddRootEntry(const wxString &key, const wxString &type,
@@ -167,7 +167,7 @@ private:
 
 Model::Model()
 {
-    m_root = new Node(nullptr, "Root", "Dictionary", "12 children");
+    m_root = new Node(nullptr, "Root", "Dictionary", "0 children");
 };
 Node *Model::AddRootEntry(const wxString &key, const wxString &type,
                           const wxString &value) const
@@ -231,6 +231,15 @@ bool Model::SetValue(const wxVariant &variant,
         wxLogError("Model::SetValue: wrong column");
     }
     return false;
+}
+
+void Model::DeleteAll()
+{
+    m_root = new Node(nullptr, "Root", "Dictionary", "0 children");
+}
+void Model::SetPlistType(const std::string &type)
+{
+    m_root->m_type = type;
 }
 
 wxDataViewItem Model::GetParent(const wxDataViewItem &item) const
@@ -426,6 +435,7 @@ void Frame::OnAbout(wxCommandEvent &event)
 }
 void Frame::OnFileOpen(wxCommandEvent &event)
 {
+    model->DeleteAll();
     wxFileDialog openFileDialog(this, _("Open Property-List file"), wxEmptyString, wxEmptyString, _("Property-List file|*.plist"), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (openFileDialog.ShowModal() == wxID_OK)
     {
@@ -434,14 +444,27 @@ void Frame::OnFileOpen(wxCommandEvent &event)
         std::vector<char> buffer((std::istreambuf_iterator<char>(PlistFile)), std::istreambuf_iterator<char>());
         buffer.push_back('\0');
         doc.parse<0>(&buffer[0]);
-        for (rapidxml::xml_node<> *node = doc.first_node("plist")->first_node("dict")->first_node(); node; node = node->next_sibling())
+        int index = 0;
+        rapidxml::xml_node<char> *root = doc.first_node("plist")->first_node();
+        for (rapidxml::xml_node<> *node = root->first_node(); node; node = node->next_sibling())
         {
-            if (strcmp(node->name(), "key"))
+            std::string key = std::string(node->name());
+            if (std::string(root->name()) == "array")
             {
-                continue;
+                Node *treeNode = model->AddRootEntry(std::to_string(index), getDisplayType(node->name()), node->value());
+                treeNode = AddNodes(treeNode, node, std::string(node->name()));
+                model->SetPlistType("Array");
             }
-            Node *treeNode = model->AddRootEntry(node->value(), getDisplayType(node->next_sibling()->name()), node->next_sibling()->value());
-            treeNode = AddNodes(treeNode, node->next_sibling(), std::string(node->next_sibling()->name()));
+            else
+            {
+                if (key != "key")
+                {
+                    continue;
+                }
+                Node *treeNode = model->AddRootEntry(node->value(), getDisplayType(node->next_sibling()->name()), node->next_sibling()->value());
+                treeNode = AddNodes(treeNode, node->next_sibling(), std::string(node->next_sibling()->name()));
+            }
+            index += 1;
         }
         dataview->AssociateModel(model);
         dataview->ExpandChildren(model->GetRoot());
