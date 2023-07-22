@@ -315,9 +315,8 @@ std::string dataString(std::string data)
     std::string str = "";
     for (int i = 0; i < data.length(); i++)
     {
-        char buffer[1];
-        str += snprintf(buffer, 1, "%02X", data[i]);
-        if ((i + 1) % 4 == 0 && i != data.length() - 1)
+        str += data[i];
+        if ((i + 1) % 8 == 0 && i != data.length() - 1)
         {
             str += " ";
         }
@@ -364,9 +363,7 @@ Node *AddNodes(Node *treeNode, rapidxml::xml_node<char> *node, std::string k)
                 std::string value = std::string(n->next_sibling()->value());
                 if (std::string(n->next_sibling()->name()) == "data")
                 {
-                    value = trim(value);
-                    value = base64::from_base64(value);
-                    value = string_to_hex(value);
+                    value = dataString(string_to_hex(base64::from_base64(trim(value))));
                 }
                 Node *tn = treeNode->AddEntry(n->value(), getDisplayType(n->next_sibling()->name()), value);
                 if (std::string(n->next_sibling()->name()) == "true")
