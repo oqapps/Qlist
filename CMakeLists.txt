@@ -11,7 +11,6 @@ set_property(DIRECTORY PROPERTY EP_BASE ${CMAKE_BINARY_DIR}/subprojects)
 set(STAGED_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/stage)
 
 add_subdirectory(thirdparty)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/build/subprojects/Build/PlistCpp_external/src/ ${CMAKE_CURRENT_SOURCE_DIR}/build/subprojects/Build/PlistCpp_external/include/boost)
 
 include(ExternalProject)
 ExternalProject_Add(${PROJECT_NAME}_core

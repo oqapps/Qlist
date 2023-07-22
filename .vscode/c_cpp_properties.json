@@ -5,6 +5,7 @@
             "includePath": [
                 "${workspaceFolder}/src/**",
                 "${workspaceFolder}/build/stage/include/wx-3.3/**",
+                "${workspaceFolder}/build/stage/include/cppcodec/**",
                 "${workspaceFolder}/build/subprojects/Build/wxWidgets_external/lib/wx/include/osx_cocoa-unicode-static-3.3/**"
             ],
             "defines": [

@@ -5,17 +5,54 @@
 #include <map>
 #include <wx/dataview.h>
 #include "rapidxml.hpp"
+#include "base64.h"
 #ifndef WX_PRECOMP
 #include <wx/wx.h>
 #endif
 
+std::string string_to_hex(const std::string &input)
+{
+    static const char hex_digits[] = "0123456789ABCDEF";
+
+    std::string output;
+    output.reserve(input.length() * 2);
+    for (unsigned char c : input)
+    {
+        output.push_back(hex_digits[c >> 4]);
+        output.push_back(hex_digits[c & 15]);
+    }
+    return output;
+}
+
+std::string &ltrim(std::string &s)
+{
+    auto it = std::find_if(s.begin(), s.end(),
+                           [](char c)
+                           {
+                               return !std::isspace<char>(c, std::locale::classic());
+                           });
+    s.erase(s.begin(), it);
+    return s;
+}
+
+std::string &rtrim(std::string &s)
+{
+    auto it = std::find_if(s.rbegin(), s.rend(),
+                           [](char c)
+                           {
+                               return !std::isspace<char>(c, std::locale::classic());
+                           });
+    s.erase(it.base(), s.end());
+    return s;
+}
+
+std::string &trim(std::string &s)
+{
+    return ltrim(rtrim(s));
+}
+
 rapidxml::xml_document<> doc;
 rapidxml::xml_node<> *root_node;
-
-static const std::string base64_chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    "abcdefghijklmnopqrstuvwxyz"
-    "0123456789+/";
 
 class Node;
 using NodePtr = std::unique_ptr<Node>;
@@ -288,57 +325,6 @@ std::string dataString(std::string data)
     return str;
 }
 
-static inline bool is_base64(unsigned char c)
-{
-    return (isalnum(c) || (c == '+') || (c == '/'));
-}
-
-std::string base64_decode(std::string const &encoded_string)
-{
-    int in_len = encoded_string.size();
-    int i = 0;
-    int j = 0;
-    int in_ = 0;
-    unsigned char char_array_4[4], char_array_3[3];
-    std::string ret;
-    while (in_len-- && (encoded_string[in_] != '=') && is_base64(encoded_string[in_]))
-    {
-        char_array_4[i++] = encoded_string[in_];
-        in_++;
-        if (i == 4)
-        {
-            for (i = 0; i < 4; i++)
-                char_array_4[i] = base64_chars.find(char_array_4[i]);
-
-            char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
-            char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
-            char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
-
-            for (i = 0; (i < 3); i++)
-                ret += char_array_3[i];
-            i = 0;
-        }
-    }
-
-    if (i)
-    {
-        for (j = i; j < 4; j++)
-            char_array_4[j] = 0;
-
-        for (j = 0; j < 4; j++)
-            char_array_4[j] = base64_chars.find(char_array_4[j]);
-
-        char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
-        char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
-        char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
-
-        for (j = 0; (j < i - 1); j++)
-            ret += char_array_3[j];
-    }
-
-    return ret;
-}
-
 Node *AddNodes(Node *treeNode, rapidxml::xml_node<char> *node, std::string k)
 {
     int index = 0;
@@ -348,6 +334,7 @@ Node *AddNodes(Node *treeNode, rapidxml::xml_node<char> *node, std::string k)
         {
             std::string key = std::string(n->name());
             std::string value = n->value();
+            value = trim(value);
 
             Node *tn = treeNode->AddEntry(std::to_string(index), getDisplayType(n->name()), value);
             if (std::string(n->name()) == "true")
@@ -377,6 +364,9 @@ Node *AddNodes(Node *treeNode, rapidxml::xml_node<char> *node, std::string k)
                 std::string value = std::string(n->next_sibling()->value());
                 if (std::string(n->next_sibling()->name()) == "data")
                 {
+                    value = trim(value);
+                    value = base64::from_base64(value);
+                    value = string_to_hex(value);
                 }
                 Node *tn = treeNode->AddEntry(n->value(), getDisplayType(n->next_sibling()->name()), value);
                 if (std::string(n->next_sibling()->name()) == "true")
