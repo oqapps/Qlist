@@ -83,12 +83,13 @@ class Node
 public:
     Node(Node *parent,
          const wxString &key, const wxString &type,
-         const wxString &value)
+         const wxString &value, const wxString &parent_type = "dict")
     {
         m_parent = parent;
         m_key = key;
         m_type = type;
         m_value = value;
+        m_parent_type = parent_type;
     }
 
     ~Node() = default;
@@ -97,7 +98,6 @@ public:
     {
         return m_children.size() > 0;
     }
-
     Node *GetParent()
     {
         return m_parent;
@@ -111,17 +111,31 @@ public:
         return m_children.at(n).get();
     }
     Node *AddEntry(const wxString &key, const wxString &type,
-                   const wxString &value)
+                   const wxString &value, const wxString &parent_type = "dict")
     {
-        Node *node = new Node(this, key, type, value);
+        Node *node = new Node(this, key, type, value, parent_type);
         m_children.push_back(NodePtr(node));
-        m_value = std::to_string(m_children.size()) + " children";
+        if (m_parent_type == "dict")
+        {
+            m_value = std::to_string(m_children.size()) + " key/value entries";
+        }
+        else if (m_parent_type == "array")
+        {
+            m_value = std::to_string(m_children.size()) + " children";
+        }
         return node;
     }
     void Append(Node *child)
     {
         m_children.push_back(NodePtr(child));
-        m_value = std::to_string(m_children.size()) + " children";
+        if (m_parent_type == "dict")
+        {
+            m_value = std::to_string(m_children.size()) + " key/value entries";
+        }
+        else if (m_parent_type == "array")
+        {
+            m_value = std::to_string(m_children.size()) + " children";
+        }
     }
     unsigned int GetChildCount() const
     {
@@ -132,6 +146,7 @@ public:
     wxString m_key;
     wxString m_type;
     wxString m_value;
+    wxString m_parent_type;
 
 private:
     Node *m_parent;
@@ -158,7 +173,7 @@ public:
     virtual unsigned int GetChildren(const wxDataViewItem &parent,
                                      wxDataViewItemArray &array) const override;
     Node *AddRootEntry(const wxString &key, const wxString &type,
-                       const wxString &value) const;
+                       const wxString &value, const wxString &parent_type = "dict") const;
     virtual bool HasContainerColumns(const wxDataViewItem &item) const override;
 
 private:
@@ -167,12 +182,12 @@ private:
 
 Model::Model()
 {
-    m_root = new Node(nullptr, "Root", "Dictionary", "0 children");
+    m_root = new Node(nullptr, "Root", "Dictionary", "");
 };
 Node *Model::AddRootEntry(const wxString &key, const wxString &type,
-                          const wxString &value) const
+                          const wxString &value, const wxString &parent_type) const
 {
-    Node *node = new Node(m_root, key, type, value);
+    Node *node = new Node(m_root, key, type, value, parent_type);
     m_root->Append(node);
     return node;
 };
@@ -197,6 +212,17 @@ void Model::GetValue(wxVariant &variant,
         variant = node->m_type;
         break;
     case 2:
+        if (node->GetChildCount() == 0)
+        {
+            if (node->m_parent_type == "dict")
+            {
+                node->m_value = "0 key/value entries";
+            }
+            else if (node->m_parent_type == "array")
+            {
+                node->m_value = "0 children";
+            }
+        }
         variant = node->m_value;
         break;
     default:
@@ -239,6 +265,14 @@ void Model::DeleteAll()
 }
 void Model::SetPlistType(const std::string &type)
 {
+    if (type == "Dictionary")
+    {
+        m_root->m_parent_type = "dict";
+    }
+    else if (type == "Array")
+    {
+        m_root->m_parent_type = "array";
+    }
     m_root->m_type = type;
 }
 
@@ -344,7 +378,7 @@ Node *AddNodes(Node *treeNode, rapidxml::xml_node<char> *node, std::string k)
             std::string value = n->value();
             value = trim(value);
 
-            Node *tn = treeNode->AddEntry(std::to_string(index), getDisplayType(n->name()), value);
+            Node *tn = treeNode->AddEntry(std::to_string(index), getDisplayType(n->name()), value, n->name());
             if (std::string(n->name()) == "true")
             {
                 tn->m_value = "True";
@@ -374,7 +408,7 @@ Node *AddNodes(Node *treeNode, rapidxml::xml_node<char> *node, std::string k)
                 {
                     value = dataString(string_to_hex(base64::from_base64(trim(value))));
                 }
-                Node *tn = treeNode->AddEntry(n->value(), getDisplayType(n->next_sibling()->name()), value);
+                Node *tn = treeNode->AddEntry(n->value(), getDisplayType(n->next_sibling()->name()), value, n->next_sibling()->name());
                 if (std::string(n->next_sibling()->name()) == "true")
                 {
                     tn->m_value = "True";
@@ -451,7 +485,7 @@ void Frame::OnFileOpen(wxCommandEvent &event)
             std::string key = std::string(node->name());
             if (std::string(root->name()) == "array")
             {
-                Node *treeNode = model->AddRootEntry(std::to_string(index), getDisplayType(node->name()), node->value());
+                Node *treeNode = model->AddRootEntry(std::to_string(index), getDisplayType(node->name()), node->value(), node->name());
                 treeNode = AddNodes(treeNode, node, std::string(node->name()));
                 model->SetPlistType("Array");
             }
@@ -461,7 +495,7 @@ void Frame::OnFileOpen(wxCommandEvent &event)
                 {
                     continue;
                 }
-                Node *treeNode = model->AddRootEntry(node->value(), getDisplayType(node->next_sibling()->name()), node->next_sibling()->value());
+                Node *treeNode = model->AddRootEntry(node->value(), getDisplayType(node->next_sibling()->name()), node->next_sibling()->value(), node->next_sibling()->name());
                 treeNode = AddNodes(treeNode, node->next_sibling(), std::string(node->next_sibling()->name()));
             }
             index += 1;
