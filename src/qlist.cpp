@@ -57,6 +57,7 @@ rapidxml::xml_node<> *root_node;
 class Node;
 using NodePtr = std::unique_ptr<Node>;
 using NodePtrArray = std::vector<NodePtr>;
+using StringVector = std::vector<wxString>;
 
 std::string getDisplayType(char *data) {
   std::string str(data);
@@ -280,6 +281,8 @@ private:
   void OnAbout(wxCommandEvent &event);
   wxDataViewCtrl *dataview;
   Model *model;
+  wxConfig *config;
+  wxMenu *openRecent;
   wxDECLARE_EVENT_TABLE();
 };
 
@@ -354,9 +357,12 @@ bool MyApp::OnInit() {
 }
 Frame::Frame(const wxString &title, const wxPoint &pos, const wxSize &size)
     : wxFrame(NULL, wxID_ANY, title, pos, size) {
+  config = new wxConfig("qlist");
   wxMenu *menuFile = new wxMenu;
-  menuFile->Append(ID_FILE, "&Open\tCtrl-O");
   menuFile->Append(ID_NEW, "&New\tCtrl-N");
+  menuFile->Append(ID_FILE, "&Open\tCtrl-O");
+  openRecent = new wxMenu;
+  menuFile->AppendSubMenu(openRecent, "&Open Recent");
   menuFile->Append(wxID_EXIT);
   menuFile->Append(wxID_ABOUT, "&About Qlist");
   menuFile->Append(wxID_PREFERENCES, "&Settings");
